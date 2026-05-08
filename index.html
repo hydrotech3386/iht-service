@@ -743,6 +743,15 @@ function sendTelegramToAdmins(text) {
   }).catch(() => {});
 }
 
+function sendTelegramToTechnicians(text) {
+  firebase.database().ref('users').once('value').then(snap => {
+    snap.forEach(child => {
+      const u = child.val();
+      if (u.role === 'technician' && u.telegramChatId) sendTelegram(u.telegramChatId, text);
+    });
+  }).catch(() => {});
+}
+
 function sendTelegramToUser(uid, text) {
   if (!uid) return;
   firebase.database().ref('users/' + uid + '/telegramChatId').once('value').then(snap => {
@@ -820,6 +829,28 @@ function snapshotCommentCounts() {
     jobs.forEach((job, idx) => { counts[dayKey + '/' + idx] = (job.comments || []).length; });
   });
   return counts;
+}
+
+function checkRevisionChanges(oldRevNums) {
+  const newRevNums = state.revNums || {};
+  Object.keys(newRevNums).forEach(wk => {
+    const oldRev = oldRevNums[wk] || 0;
+    const newRev = newRevNums[wk] || 0;
+    if (newRev > oldRev) {
+      // Format week date range for the message
+      const [y, m, d] = wk.split('-').map(Number);
+      const mon = new Date(y, m - 1, d);
+      const sat = new Date(y, m - 1, d + 5);
+      const fmt = dt => dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const weekRange = `${fmt(mon)} – ${fmt(sat)}`;
+      const msg = [
+        `📅 <b>Schedule Updated</b>`,
+        `Week: ${weekRange}`,
+        `Revision: <b>${newRev}</b>`
+      ].join('\n');
+      sendTelegramToTechnicians(msg);
+    }
+  });
 }
 
 function checkNewComments(oldCounts) {
@@ -1016,6 +1047,7 @@ function setupFirebaseListener() {
         const fbTs = fbData.lastModified || 0;
         if (fbTs > localTs) {
           const oldCounts = isFirstSchedSnap ? null : snapshotCommentCounts();
+          const oldRevNums = isFirstSchedSnap ? null : Object.assign({}, state.revNums || {});
           const savedWeekStart = state.weekStart;
           const savedCurrentDay = currentDay;
           try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
@@ -1023,7 +1055,10 @@ function setupFirebaseListener() {
           currentDay = savedCurrentDay;
           localStorage.setItem(STORAGE_KEY, JSON.stringify(fbData));
           if (isFirstSchedSnap) { isFirstSchedSnap = false; }
-          else if (oldCounts) { checkNewComments(oldCounts); }
+          else {
+            if (oldCounts) checkNewComments(oldCounts);
+            if (oldRevNums) checkRevisionChanges(oldRevNums);
+          }
           try { render(); } catch(e) {}
           if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
             const d = getDayData(commentContext.dayKey);
