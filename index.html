@@ -62,6 +62,7 @@
   /* Comment modal */
   .comment-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;margin:12px 0;padding-right:2px}
   .comment-item{background:#0f3460;border-radius:8px;padding:10px 12px;position:relative}
+  .comment-author{font-size:11px;font-weight:700;color:#4fc3f7;margin-bottom:2px}
   .comment-text{font-size:13px;color:#e0e0e0;line-height:1.4;white-space:pre-wrap;padding-right:52px}
   .comment-time{font-size:10px;color:#555;margin-top:4px}
   .comment-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px;opacity:0;transition:opacity .15s}
@@ -1665,22 +1666,31 @@ function openComments(dayKey, jobIdx) {
   setTimeout(() => document.getElementById('commentInput').focus(), 100);
 }
 
+function canEditComment(c) {
+  if (currentRole === 'admin') return true;
+  if (!currentUser || currentUser.isAnonymous) return false;
+  return c.authorUid && c.authorUid === currentUser.uid;
+}
+
 function renderCommentList(comments) {
   const list = document.getElementById('commentList');
   if (!comments.length) {
     list.innerHTML = '<div class="comment-empty">No comments yet. Be the first to add one.</div>';
     return;
   }
-  const editBtns = currentRole === 'admin' ? `<div class="comment-actions">
-      <button onclick="editComment(IDX)" title="Edit">✏</button>
-      <button onclick="deleteComment(IDX)" title="Delete">✕</button>
+  list.innerHTML = comments.map((c, i) => {
+    const editBtns = canEditComment(c) ? `<div class="comment-actions">
+      <button onclick="editComment(${i})" title="Edit">✏</button>
+      <button onclick="deleteComment(${i})" title="Delete">✕</button>
     </div>` : '';
-  list.innerHTML = comments.map((c, i) => `
-    <div class="comment-item">
-      ${editBtns.replace(/IDX/g, i)}
+    const author = c.authorName || 'Anonymous';
+    return `<div class="comment-item">
+      ${editBtns}
+      <div class="comment-author">${author}</div>
       <div class="comment-text">${c.text.replace(/</g,'&lt;')}</div>
       <div class="comment-time">${fmtCommentTime(c.ts)}${c.edited ? ' (edited)' : ''}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   list.scrollTop = list.scrollHeight;
 }
 
@@ -1740,7 +1750,13 @@ function addComment() {
   const job = data.jobs[jobIdx];
   if (!job) return;
   if (!Array.isArray(job.comments)) job.comments = [];
-  job.comments.push({ text, ts: Date.now() });
+  const isAnon = !currentUser || currentUser.isAnonymous;
+  job.comments.push({
+    text,
+    ts: Date.now(),
+    authorUid: currentUser ? currentUser.uid : null,
+    authorName: isAnon ? 'Anonymous' : (document.getElementById('userName').textContent || currentUser.email || 'User')
+  });
   document.getElementById('commentInput').value = '';
   renderCommentList(job.comments);
   // Anonymous view-only users write only this day's jobs atomically
