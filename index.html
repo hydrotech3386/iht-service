@@ -158,26 +158,84 @@
   .auth-card{background:#16213e;border:1px solid #0f3460;border-radius:12px;padding:32px 28px;width:100%;max-width:340px;text-align:center}
   .auth-card h2{color:#e94560;font-size:18px;margin-bottom:6px}
   .auth-card p{color:#888;font-size:13px;margin-bottom:20px}
-  .auth-input{width:100%;background:#0f3460;border:1px solid #333;color:#fff;border-radius:8px;padding:10px 14px;font-size:15px;text-align:center;letter-spacing:2px;margin-bottom:10px}
+  .auth-input{width:100%;background:#0f3460;border:1px solid #333;color:#fff;border-radius:8px;padding:10px 14px;font-size:15px;text-align:left;letter-spacing:0;margin-bottom:10px}
   .auth-input:focus{outline:none;border-color:#e94560}
-  .auth-error{color:#e94560;font-size:12px;height:16px;margin-bottom:10px}
+  .auth-error{color:#e94560;font-size:12px;min-height:16px;margin-bottom:10px}
   .auth-btn{width:100%;background:#e94560;border:none;color:#fff;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:14px}
   .auth-btn:hover{background:#c0392b}
-  .auth-view-link{color:#555;font-size:12px;text-decoration:none}
+  .auth-link-row{display:flex;justify-content:space-between;align-items:center}
+  .auth-view-link{color:#555;font-size:12px;cursor:pointer;text-decoration:none}
   .auth-view-link:hover{color:#aaa}
   @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
   .shake{animation:shake .35s ease}
 
-  /* View-only mode */
+  /* User info in header */
+  .user-info{display:flex;align-items:center;gap:8px;font-size:12px;color:#aaa}
+  .user-name{color:#fff;font-weight:600;font-size:12px}
+  .role-badge{font-size:10px;font-weight:700;border-radius:4px;padding:2px 6px;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
+  .role-badge.admin{background:#e94560;color:#fff}
+  .role-badge.salesman{background:#27ae60;color:#fff}
+  .role-badge.technician{background:#2980b9;color:#fff}
+  .role-badge.pending{background:#555;color:#aaa}
+  .btn-logout{background:#1a1a2e;border:1px solid #444;color:#aaa;padding:4px 9px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap}
+  .btn-logout:hover{background:#e94560;color:#fff;border-color:#e94560}
+  .btn-users{background:#6c3483;color:#fff}
+  .btn-users:hover{background:#5b2c6f}
+
+  /* Job status badge */
+  .status-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;border-radius:10px;padding:2px 8px;margin-top:5px;letter-spacing:.3px;user-select:none}
+  .status-badge.clickable{cursor:pointer}
+  .status-badge.clickable:hover{filter:brightness(1.2)}
+  .status-badge.pending{background:#1e1e2e;color:#666;border:1px solid #333}
+  .status-badge.in-progress{background:#2a1f00;color:#f39c12;border:1px solid #f39c12}
+  .status-badge.completed{background:#0a1f0a;color:#27ae60;border:1px solid #27ae60}
+  .status-badge.cancelled{background:#200a0a;color:#e94560;border:1px solid #e94560}
+
+  /* Role-based permission rules */
+  /* View-only */
   .view-only .toolbar{display:none}
   .view-only .rev-box input{pointer-events:none;border-color:transparent;background:transparent}
   .view-only .btn-edit-job{display:none}
   .view-only .holiday-toggle input,.view-only .holiday-toggle label[for]{pointer-events:none}
   .view-only .chip-btn{display:none}
   .view-only .leave-label{display:none}
-  .view-only .manage-members,.view-only .manage-salesmen{display:none}
+  .view-only .manage-members{display:none}
+  .view-only .comment-actions{display:none}
   .view-only-badge{display:none;background:#2980b9;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px;letter-spacing:.5px;white-space:nowrap}
   .view-only .view-only-badge{display:inline-block}
+  /* Salesman */
+  .role-salesman .btn-edit-job{display:none}
+  .role-salesman .btn-del-week{display:none}
+  .role-salesman .btn-copy{display:none}
+  .role-salesman .btn-summary{display:none}
+  .role-salesman .btn-load{display:none}
+  .role-salesman .btn-backup{display:none}
+  .role-salesman .btn-pdf{display:none}
+  .role-salesman .btn-users{display:none}
+  .role-salesman .holiday-toggle input,.role-salesman .holiday-toggle label[for]{pointer-events:none}
+  .role-salesman .chip-btn{display:none}
+  .role-salesman .rev-box input{pointer-events:none;border-color:transparent;background:transparent}
+  .role-salesman .manage-members{display:none}
+  .role-salesman #ibToggle,.role-salesman #ibAmountRow{display:none}
+  .role-salesman .comment-actions{display:none}
+  .role-salesman .status-badge{cursor:default!important}
+  /* Technician */
+  .role-technician .btn-add{display:none}
+  .role-technician .btn-edit-job{display:none}
+  .role-technician .btn-del-week{display:none}
+  .role-technician .btn-copy{display:none}
+  .role-technician .btn-summary{display:none}
+  .role-technician .btn-load{display:none}
+  .role-technician .btn-backup{display:none}
+  .role-technician .btn-pdf{display:none}
+  .role-technician .btn-users{display:none}
+  .role-technician .holiday-toggle{display:none}
+  .role-technician .chip-btn{display:none}
+  .role-technician .rev-box{display:none}
+  .role-technician .manage-members{display:none}
+  .role-technician .ib-badge{display:none}
+  .role-technician .job-card.internal-billing{border-color:#0f3460;border-left-width:1px}
+  .role-technician .comment-actions{display:none}
 
   /* Sync status */
   .sync-status{display:flex;align-items:center;gap:5px;font-size:11px;color:#aaa;white-space:nowrap}
@@ -204,6 +262,14 @@
   .absence-badge{font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle}
   .absence-badge.leave{background:#e67e22;color:#fff}
   .absence-badge.mc{background:#9b59b6;color:#fff}
+
+  /* Manage users */
+  .users-list{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;margin:12px 0}
+  .user-row{display:flex;align-items:center;gap:12px;background:#0f3460;border-radius:8px;padding:10px 12px}
+  .user-row-name{font-size:13px;color:#fff;font-weight:600}
+  .user-row-email{font-size:11px;color:#666;margin-top:2px}
+  .user-row-role{background:#1a1a2e;border:1px solid #444;color:#fff;border-radius:6px;padding:5px 8px;font-size:12px;cursor:pointer}
+  .user-row-role:focus{outline:none;border-color:#e94560}
 
   /* ── Mobile ── */
   @media (max-width: 640px) {
@@ -301,14 +367,42 @@
 <body>
 
 <div class="auth-overlay" id="authOverlay">
-  <div class="auth-card">
-    <h2>🔒 Editor Access</h2>
-    <p>Enter password to edit the schedule</p>
-    <input class="auth-input" type="password" id="authInput" placeholder="Password"
-      onkeydown="if(event.key==='Enter')submitPassword()">
-    <div class="auth-error" id="authError"></div>
-    <button class="auth-btn" onclick="submitPassword()">Unlock</button>
-    <a class="auth-view-link" href="?view">View only instead →</a>
+  <!-- Login card -->
+  <div class="auth-card" id="loginCard">
+    <h2>⚙ Hydrotech Service</h2>
+    <p>Sign in to access the schedule</p>
+    <input class="auth-input" type="email" id="loginEmail" placeholder="Email address"
+      onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
+    <input class="auth-input" type="password" id="loginPass" placeholder="Password"
+      onkeydown="if(event.key==='Enter')loginUser()">
+    <div class="auth-error" id="loginError"></div>
+    <button class="auth-btn" onclick="loginUser()">Sign In</button>
+    <div class="auth-link-row">
+      <a class="auth-view-link" onclick="showRegister()">New user? Register →</a>
+      <a class="auth-view-link" href="?view">View only →</a>
+    </div>
+  </div>
+  <!-- Register card -->
+  <div class="auth-card" id="registerCard" style="display:none">
+    <h2>👤 Create Account</h2>
+    <p>Request access to the schedule</p>
+    <input class="auth-input" type="text" id="regName" placeholder="Your name"
+      onkeydown="if(event.key==='Enter')document.getElementById('regEmail').focus()">
+    <input class="auth-input" type="email" id="regEmail" placeholder="Email address"
+      onkeydown="if(event.key==='Enter')document.getElementById('regPass').focus()">
+    <input class="auth-input" type="password" id="regPass" placeholder="Password (min 6 chars)"
+      onkeydown="if(event.key==='Enter')registerUser()">
+    <div class="auth-error" id="regError"></div>
+    <button class="auth-btn" onclick="registerUser()">Register</button>
+    <div class="auth-link-row">
+      <a class="auth-view-link" onclick="showLogin()">← Back to sign in</a>
+    </div>
+  </div>
+  <!-- Pending approval card -->
+  <div class="auth-card" id="pendingCard" style="display:none">
+    <h2>⏳ Pending Approval</h2>
+    <p id="pendingMsg" style="color:#888;font-size:13px;margin-bottom:20px">Your account is waiting for admin approval. Contact the administrator to get access.</p>
+    <button class="auth-btn" style="background:#555" onclick="logoutUser()">Sign Out</button>
   </div>
 </div>
 
@@ -316,6 +410,11 @@
 <header>
   <h1>⚙ Hydrotech Service Schedule</h1>
   <span class="view-only-badge">VIEW ONLY</span>
+  <div class="user-info" id="userInfo" style="display:none">
+    <span class="user-name" id="userName"></span>
+    <span class="role-badge" id="userRoleBadge"></span>
+    <button class="btn-logout" onclick="logoutUser()">Sign Out</button>
+  </div>
   <div class="sync-status"><div class="sync-dot syncing" id="syncDot"></div><span id="syncLabel">Connecting...</span></div>
   <div class="rev-box">Rev <input type="number" id="revNum" value="0" min="0"></div>
   <div class="week-nav">
@@ -334,6 +433,7 @@
   <button class="btn-backup" onclick="exportBackup()">⬇ Backup</button>
   <button class="btn-backup" onclick="importBackup()" style="background:#6c3483">⬆ Restore</button>
   <button class="btn-pdf" onclick="exportWeekPDF()">📄 Export PDF</button>
+  <button class="btn-users" onclick="openManageUsers()">👥 Users</button>
 </div>
 
 <div class="days-tabs" id="daysTabs"></div>
@@ -460,33 +560,221 @@
   </div>
 </div>
 
+<!-- Manage Users Modal -->
+<div class="modal-bg" id="usersBg">
+  <div class="modal" style="max-width:540px">
+    <h2>👥 Manage Users</h2>
+    <div class="users-list" id="usersList">
+      <div style="color:#555;font-size:13px;text-align:center;padding:20px">Loading...</div>
+    </div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="btn-cancel" onclick="document.getElementById('usersBg').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const STORAGE_KEY = 'hydrotech_schedule_v1';
 const VIEW_ONLY = new URLSearchParams(window.location.search).has('view');
-const EDITOR_PASS = 'iht2025'; // change this to your preferred password
 
-// ---- Auth ----
-function checkAuth() {
-  if (VIEW_ONLY) return;
-  if (sessionStorage.getItem('iht_auth') === '1') return;
-  document.getElementById('authOverlay').classList.add('open');
-  setTimeout(() => document.getElementById('authInput').focus(), 100);
+// ---- Auth & Roles ----
+let currentUser = null;
+let currentRole = 'view-only';
+const STATUS_CYCLE = ['pending','in-progress','completed','cancelled'];
+const STATUS_LABELS = {'pending':'Pending','in-progress':'In Progress','completed':'Completed','cancelled':'Cancelled'};
+
+function showLogin() {
+  document.getElementById('loginCard').style.display = '';
+  document.getElementById('registerCard').style.display = 'none';
+  document.getElementById('pendingCard').style.display = 'none';
+  document.getElementById('loginError').textContent = '';
+  setTimeout(() => document.getElementById('loginEmail').focus(), 100);
 }
 
-function submitPassword() {
-  const val = document.getElementById('authInput').value;
-  if (val === EDITOR_PASS) {
-    sessionStorage.setItem('iht_auth', '1');
-    document.getElementById('authOverlay').classList.remove('open');
+function showRegister() {
+  document.getElementById('loginCard').style.display = 'none';
+  document.getElementById('registerCard').style.display = '';
+  document.getElementById('pendingCard').style.display = 'none';
+  document.getElementById('regError').textContent = '';
+  setTimeout(() => document.getElementById('regName').focus(), 100);
+}
+
+function loginUser() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Please enter email and password.'; return; }
+  firebase.auth().signInWithEmailAndPassword(email, pass)
+    .catch(e => { errEl.textContent = getAuthError(e.code); });
+}
+
+function registerUser() {
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pass = document.getElementById('regPass').value;
+  const errEl = document.getElementById('regError');
+  errEl.textContent = '';
+  if (!name || !email || !pass) { errEl.textContent = 'Please fill all fields.'; return; }
+  if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+  firebase.auth().createUserWithEmailAndPassword(email, pass)
+    .then(cred => {
+      // First registered user automatically becomes admin
+      return firebase.database().ref('users').once('value').then(snap => {
+        const existing = snap.val() || {};
+        const isFirst = Object.keys(existing).filter(k => k !== cred.user.uid).length === 0;
+        return firebase.database().ref('users/' + cred.user.uid).set({
+          name, email, role: isFirst ? 'admin' : 'pending', createdAt: Date.now()
+        });
+      });
+    })
+    .catch(e => { document.getElementById('regError').textContent = getAuthError(e.code); });
+}
+
+function logoutUser() {
+  if (fbRef) fbRef.off();
+  firebase.auth().signOut().then(() => {
+    currentUser = null;
+    applyRole('view-only');
+    document.getElementById('userInfo').style.display = 'none';
+    if (!VIEW_ONLY) {
+      document.getElementById('authOverlay').classList.add('open');
+      showLogin();
+    }
+    setSyncStatus('offline');
+  });
+}
+
+function getAuthError(code) {
+  const msgs = {
+    'auth/user-not-found': 'No account found with this email.',
+    'auth/wrong-password': 'Incorrect password.',
+    'auth/invalid-email': 'Invalid email address.',
+    'auth/email-already-in-use': 'This email is already registered.',
+    'auth/weak-password': 'Password is too weak.',
+    'auth/too-many-requests': 'Too many attempts. Try again later.',
+    'auth/invalid-credential': 'Invalid email or password.'
+  };
+  return msgs[code] || 'Authentication failed. Please try again.';
+}
+
+function applyRole(role) {
+  currentRole = role;
+  document.body.classList.remove('view-only','role-admin','role-salesman','role-technician');
+  if (role === 'admin') document.body.classList.add('role-admin');
+  else if (role === 'salesman') document.body.classList.add('role-salesman');
+  else if (role === 'technician') document.body.classList.add('role-technician');
+  else document.body.classList.add('view-only');
+}
+
+function fetchUserData(uid) {
+  return firebase.database().ref('users/' + uid).once('value').then(snap => snap.val() || {});
+}
+
+function updateUserInfo(name, role) {
+  const info = document.getElementById('userInfo');
+  info.style.display = 'flex';
+  document.getElementById('userName').textContent = name;
+  const badge = document.getElementById('userRoleBadge');
+  badge.textContent = role.toUpperCase();
+  badge.className = 'role-badge ' + role;
+}
+
+function setupFirebaseListener() {
+  setSyncStatus('syncing');
+  if (VIEW_ONLY || currentRole === 'view-only') {
+    fbRef.on('value', snapshot => {
+      const fbData = snapshot.val();
+      if (fbData) {
+        try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
+        try { render(); } catch(e) {}
+        if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
+          const d = getDayData(commentContext.dayKey);
+          const job = d.jobs[commentContext.jobIdx];
+          if (job) renderCommentList(job.comments || []);
+        }
+      }
+      setSyncStatus('synced');
+    }, () => setSyncStatus('offline'));
   } else {
-    const input = document.getElementById('authInput');
-    input.value = '';
-    input.classList.add('shake');
-    document.getElementById('authError').textContent = 'Incorrect password';
-    setTimeout(() => { input.classList.remove('shake'); }, 400);
-    setTimeout(() => input.focus(), 50);
+    fbRef.on('value', snapshot => {
+      const fbData = snapshot.val();
+      if (fbData) {
+        const localTs = state.lastModified || 0;
+        const fbTs = fbData.lastModified || 0;
+        if (fbTs > localTs) {
+          const savedWeekStart = state.weekStart;
+          const savedCurrentDay = currentDay;
+          try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
+          state.weekStart = savedWeekStart;
+          currentDay = savedCurrentDay;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(fbData));
+          try { render(); } catch(e) {}
+          if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
+            const d = getDayData(commentContext.dayKey);
+            const job = d.jobs[commentContext.jobIdx];
+            if (job) renderCommentList(job.comments || []);
+          }
+        }
+      }
+      setSyncStatus('synced');
+    }, () => setSyncStatus('offline'));
   }
+}
+
+// ---- Manage Users ----
+function openManageUsers() {
+  if (currentRole !== 'admin') return;
+  document.getElementById('usersBg').classList.add('open');
+  renderUsersList();
+}
+
+function renderUsersList() {
+  const list = document.getElementById('usersList');
+  list.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:20px">Loading...</div>';
+  firebase.database().ref('users').once('value').then(snap => {
+    const users = snap.val();
+    if (!users || Object.keys(users).length === 0) {
+      list.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:20px">No registered users.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    Object.entries(users).sort((a,b) => (a[1].name||'').localeCompare(b[1].name||'')).forEach(([uid, u]) => {
+      const row = document.createElement('div');
+      row.className = 'user-row';
+      const roleOpts = ['pending','technician','salesman','admin'].map(r =>
+        `<option value="${r}" ${u.role===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`
+      ).join('');
+      row.innerHTML = `
+        <div style="flex:1;min-width:0">
+          <div class="user-row-name">${u.name || 'Unknown'}</div>
+          <div class="user-row-email">${u.email || uid}</div>
+        </div>
+        <select class="user-row-role" onchange="setUserRole('${uid}',this.value)">${roleOpts}</select>`;
+      list.appendChild(row);
+    });
+  }).catch(() => {
+    list.innerHTML = '<div style="color:#e94560;font-size:13px;text-align:center;padding:20px">Failed to load users.</div>';
+  });
+}
+
+function setUserRole(uid, role) {
+  firebase.database().ref('users/' + uid + '/role').set(role)
+    .catch(e => alert('Failed to update role: ' + e.message));
+}
+
+// ---- Job Status ----
+function updateJobStatus(idx) {
+  if (currentRole !== 'admin' && currentRole !== 'technician') return;
+  const data = getDayData(currentDay);
+  const job = data.jobs[idx];
+  if (!job) return;
+  const cur = job.status || 'pending';
+  const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
+  job.status = next;
+  persistState();
+  renderDay();
 }
 
 let state = {
@@ -576,8 +864,8 @@ function applyStateData(data) {
 }
 
 function init() {
-  checkAuth();
-  if (VIEW_ONLY) document.body.classList.add('view-only');
+  // Default to view-only class until auth resolves
+  document.body.classList.add('view-only');
 
   // 1. Load localStorage immediately so UI shows fast
   try {
@@ -599,57 +887,51 @@ function init() {
   document.getElementById('revNum').addEventListener('change', e => { state.revNums[weekKey(state.weekStart)] = parseInt(e.target.value)||0; persistState(); });
   try { render(); } catch(e) { console.error('Render error:', e); }
 
-  // 2. Connect Firebase — sign in anonymously then load
+  // 2. Init Firebase
   initFirebase();
-  if (fbReady) {
+  if (!fbReady) { setSyncStatus('offline'); return; }
+
+  if (VIEW_ONLY) {
+    // Silent anonymous auth for view-only URL
     setSyncStatus('syncing');
-    firebase.auth().signInAnonymously().then(() => {
-      if (VIEW_ONLY) {
-        // Live listener — auto-updates when editors save
-        fbRef.on('value', snapshot => {
-          const fbData = snapshot.val();
-          if (fbData) {
-            try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
-            try { render(); } catch(e) {}
-            // Refresh comment modal if open
-            if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
-              const d = getDayData(commentContext.dayKey);
-              const job = d.jobs[commentContext.jobIdx];
-              if (job) renderCommentList(job.comments || []);
-            }
-          }
-          setSyncStatus('synced');
-        }, () => setSyncStatus('offline'));
-      } else {
-        // Editor: live listener so comment updates from view-only users arrive in real-time
-        fbRef.on('value', snapshot => {
-          const fbData = snapshot.val();
-          if (fbData) {
-            const localTs = state.lastModified || 0;
-            const fbTs = fbData.lastModified || 0;
-            if (fbTs > localTs) {
-              const savedWeekStart = state.weekStart;
-              const savedCurrentDay = currentDay;
-              try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
-              // Preserve week the editor is currently viewing
-              state.weekStart = savedWeekStart;
-              currentDay = savedCurrentDay;
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(fbData));
-              try { render(); } catch(e) {}
-              // Refresh comment modal if open
-              if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
-                const d = getDayData(commentContext.dayKey);
-                const job = d.jobs[commentContext.jobIdx];
-                if (job) renderCommentList(job.comments || []);
-              }
-            }
-          }
-          setSyncStatus('synced');
-        }, () => setSyncStatus('offline'));
-      }
-    }).catch(() => setSyncStatus('offline'));
+    firebase.auth().signInAnonymously()
+      .then(() => {
+        applyRole('view-only');
+        setupFirebaseListener();
+      })
+      .catch(() => setSyncStatus('offline'));
   } else {
-    setSyncStatus('offline');
+    // Auth state listener for regular URL
+    firebase.auth().onAuthStateChanged(user => {
+      if (!user) {
+        applyRole('view-only');
+        document.getElementById('authOverlay').classList.add('open');
+        showLogin();
+        return;
+      }
+      if (user.isAnonymous) {
+        firebase.auth().signOut();
+        return;
+      }
+      currentUser = user;
+      fetchUserData(user.uid).then(userData => {
+        const role = userData.role || 'pending';
+        const name = userData.name || user.email;
+        if (role === 'pending') {
+          applyRole('view-only');
+          document.getElementById('loginCard').style.display = 'none';
+          document.getElementById('registerCard').style.display = 'none';
+          document.getElementById('pendingCard').style.display = '';
+          document.getElementById('pendingMsg').textContent = `Welcome, ${name}! Your account is waiting for admin approval.`;
+          document.getElementById('authOverlay').classList.add('open');
+        } else {
+          applyRole(role);
+          document.getElementById('authOverlay').classList.remove('open');
+          updateUserInfo(name, role);
+          setupFirebaseListener();
+        }
+      });
+    });
   }
 }
 
@@ -780,6 +1062,9 @@ function renderDay() {
 
   data.jobs.forEach((job, idx) => {
     const cmtCount = (job.comments || []).length;
+    const status = job.status || 'pending';
+    const statusLabel = STATUS_LABELS[status] || status;
+    const canClickStatus = currentRole === 'admin' || currentRole === 'technician';
     const card = document.createElement('div');
     card.className = 'job-card' + (job.internalBilling ? ' internal-billing' : '');
     card.innerHTML = `
@@ -788,6 +1073,7 @@ function renderDay() {
         <div class="job-team">${job.team || ''}${job.internalBilling ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}</div>
         <div class="job-customer">${job.customer || ''}${job.contact ? ' <span class="contact">'+job.contact+'</span>' : ''}${job.address ? ' '+job.address : ''}${job.salesman ? ' ('+job.salesman+')' : ''}</div>
         ${job.desc ? `<div class="job-desc">${job.desc}</div>` : ''}
+        <span class="status-badge ${status}${canClickStatus?' clickable':''}" ${canClickStatus?`onclick="updateJobStatus(${idx})"`:''}>${statusLabel}</span>
       </div>
       <div class="job-actions">
         <button class="btn-comment" onclick="openComments('${currentDay}',${idx})" title="Comments">💬${cmtCount ? `<span class="comment-badge">${cmtCount}</span>` : ''}</button>
@@ -1017,6 +1303,8 @@ function closeModal() {
 }
 
 function saveJob() {
+  const data = getDayData(currentDay);
+  const existing = editingJob !== null ? data.jobs[editingJob.jobIdx] : null;
   const job = {
     team: getCheckedMembers().join(','),
     customer: document.getElementById('fCustomer').value.trim(),
@@ -1025,9 +1313,10 @@ function saveJob() {
     salesman: getSelectedSalesman(),
     internalBilling: document.getElementById('fInternalBilling').checked,
     ibAmount: document.getElementById('fInternalBilling').checked ? (parseFloat(document.getElementById('fIBAmount').value) || 0) : 0,
-    desc: document.getElementById('fDesc').value.trim()
+    desc: document.getElementById('fDesc').value.trim(),
+    status: existing ? (existing.status || 'pending') : 'pending',
+    comments: existing ? (existing.comments || []) : []
   };
-  const data = getDayData(currentDay);
   if (editingJob !== null) {
     data.jobs[editingJob.jobIdx] = job;
   } else {
@@ -1087,10 +1376,10 @@ function renderCommentList(comments) {
     list.innerHTML = '<div class="comment-empty">No comments yet. Be the first to add one.</div>';
     return;
   }
-  const editBtns = VIEW_ONLY ? '' : `<div class="comment-actions">
+  const editBtns = currentRole === 'admin' ? `<div class="comment-actions">
       <button onclick="editComment(IDX)" title="Edit">✏</button>
       <button onclick="deleteComment(IDX)" title="Delete">✕</button>
-    </div>`;
+    </div>` : '';
   list.innerHTML = comments.map((c, i) => `
     <div class="comment-item">
       ${editBtns.replace(/IDX/g, i)}
@@ -1159,8 +1448,8 @@ function addComment() {
   job.comments.push({ text, ts: Date.now() });
   document.getElementById('commentInput').value = '';
   renderCommentList(job.comments);
-  // Save: view-only writes only this day's jobs; editors use full persistState
-  if (VIEW_ONLY) {
+  // Anonymous view-only users write only this day's jobs atomically
+  if (VIEW_ONLY || currentRole === 'view-only') {
     saveCommentToFirebase(dayKey, data.jobs);
   } else {
     persistState();
@@ -1359,7 +1648,7 @@ function setSyncStatus(status) {
 
 // ---- Persistence ----
 function persistState() {
-  if (VIEW_ONLY) return; // view-only users never write
+  if (VIEW_ONLY || currentRole === 'view-only' || currentRole === 'pending') return;
   state.lastModified = Date.now();
   const toSave = { ...state, weekStart: state.weekStart.toISOString() };
   localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
@@ -1611,6 +1900,7 @@ document.addEventListener('keydown', e => {
     closeModal();
     document.getElementById('waBg').classList.remove('open');
     document.getElementById('commentBg').classList.remove('open');
+    document.getElementById('usersBg').classList.remove('open');
   }
 });
 
