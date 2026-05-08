@@ -719,24 +719,11 @@ const STATUS_LABELS = {'pending':'Pending','in-progress':'In Progress','complete
 // ---- Notifications ----
 const TG_TOKEN = '8371008663:AAFZVlpuQ9PAsYu1nTOUDBVr9lvAWLrnHQw';
 
-let notifEnabled = false;
 let seenReqKeys = new Set();
 let isFirstReqSnap = true;
 let prevCommentCounts = {};
 let isFirstSchedSnap = true;
 
-function requestNotifPermission() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'granted') { notifEnabled = true; return; }
-  if (Notification.permission !== 'denied') {
-    Notification.requestPermission().then(p => { notifEnabled = p === 'granted'; });
-  }
-}
-
-function showNotif(title, body) {
-  if (!notifEnabled || Notification.permission !== 'granted') return;
-  try { new Notification(title, { body }); } catch(e) {}
-}
 
 function sendTelegram(chatId, text) {
   if (!chatId) return;
@@ -856,7 +843,6 @@ function checkNewComments(oldCounts) {
           ].filter(Boolean).join('\n');
           const adminMsg = `💬 <b>New Comment</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${author}: ${preview}`;
           const salesmanMsg = `💬 <b>New Comment on Your Job</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${author}: ${preview}`;
-          showNotif('💬 New Comment', `${job.customer || 'Job'}: ${preview}`);
           sendTelegramToAdmins(adminMsg);
           if (job.salesmanUid && job.salesmanUid !== c.authorUid) {
             sendTelegramToUser(job.salesmanUid, salesmanMsg);
@@ -947,7 +933,7 @@ function getAuthError(code) {
 function applyRole(role) {
   currentRole = role;
   document.body.classList.remove('view-only','role-admin','role-salesman','role-technician');
-  if (role === 'admin') { document.body.classList.add('role-admin'); requestNotifPermission(); }
+  if (role === 'admin') { document.body.classList.add('role-admin'); }
   else if (role === 'salesman') document.body.classList.add('role-salesman');
   else if (role === 'technician') document.body.classList.add('role-technician');
   else document.body.classList.add('view-only');
@@ -1003,7 +989,6 @@ function setupFirebaseListener() {
             r.desc      ? `📝 ${r.desc}` : null,
             `🙋 By: ${r.salesmanName || r.salesmanEmail || 'Unknown'}`
           ].filter(Boolean).join('\n');
-          showNotif('📋 New Service Request', `${r.customer} — by ${r.salesmanName || '?'}`);
           sendTelegramToAdmins(lines);
         });
       }
