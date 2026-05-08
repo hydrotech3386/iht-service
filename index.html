@@ -613,7 +613,7 @@
     <input type="file" id="photoFileInput" accept="image/*" capture="environment" style="display:none" onchange="handlePhotoFile(event)">
     <div id="photoUploadMsg" style="font-size:12px;color:#aaa;min-height:16px;text-align:center;margin-top:6px"></div>
     <div class="modal-actions" style="margin-top:10px">
-      <button class="btn-cancel" onclick="document.getElementById('photoBg').classList.remove('open')">Close</button>
+      <button class="btn-cancel" onclick="closePhotoBg()">Close</button>
     </div>
   </div>
 </div>
@@ -1272,6 +1272,8 @@ function loadRequests() {
         ? `<button class="btn-assign" onclick="editRequest('${r._key}')" style="background:#2980b9">✏️ Edit</button>` : '';
       const delBtn = (currentRole === 'admin' || canEdit)
         ? `<button class="btn-req-del" onclick="deleteRequest('${r._key}')" title="Remove">✕</button>` : '';
+      const photoBtn = (currentRole === 'admin' || isOwn)
+        ? `<button class="btn-assign" onclick="openPhotosForRequest('${r._key}')" style="background:#6c5ce7" title="Photos">📷</button>` : '';
       item.innerHTML = `
         <div class="req-item-body">
           <div class="req-customer">${r.customer}${schedHtml}</div>
@@ -1279,7 +1281,7 @@ function loadRequests() {
           ${r.desc?`<div class="req-desc">${r.desc}</div>`:''}
           <div class="req-meta">${prefHtml}By ${r.salesmanName||r.salesmanEmail||'?'} · ${dateStr}</div>
         </div>
-        <div class="req-actions">${adminActions}${editBtn}${delBtn}</div>`;
+        <div class="req-actions">${adminActions}${editBtn}${photoBtn}${delBtn}</div>`;
       list.appendChild(item);
     });
   }).catch(() => {
@@ -2413,16 +2415,43 @@ function openPhotos(dayKey, jobIdx) {
   if (!job) return;
   photoContext = { dayKey, jobIdx };
   document.getElementById('photoTitle').textContent = `📷 ${job.customer || 'Job ' + (jobIdx + 1)}`;
-  const canUpload = currentRole === 'admin' || currentRole === 'technician';
+  const canUpload = currentRole === 'admin' || currentRole === 'technician' || currentRole === 'salesman';
   document.getElementById('photoUploadBtn').style.display = canUpload ? 'block' : 'none';
   document.getElementById('photoUploadMsg').textContent = '';
   renderPhotoGrid(job.photos || []);
   document.getElementById('photoBg').classList.add('open');
 }
 
+function closePhotoBg() {
+  document.getElementById('photoBg').classList.remove('open');
+  if (photoContext && photoContext.mode === 'request') {
+    document.getElementById('requestsBg').classList.add('open');
+  }
+}
+
+function openPhotosForRequest(reqKey) {
+  photoContext = { mode: 'request', reqKey };
+  firebase.database().ref('requests/' + reqKey).once('value').then(snap => {
+    const r = snap.val() || {};
+    document.getElementById('photoTitle').textContent = `📷 ${r.customer || 'Request'}`;
+    const isOwn = currentUser && r.submittedByUid === currentUser.uid;
+    const canUpload = currentRole === 'admin' || isOwn;
+    document.getElementById('photoUploadBtn').style.display = canUpload ? 'block' : 'none';
+    document.getElementById('photoUploadMsg').textContent = '';
+    renderPhotoGrid(r.photos || []);
+    document.getElementById('requestsBg').classList.remove('open');
+    document.getElementById('photoBg').classList.add('open');
+  });
+}
+
+function canDeletePhoto(p) {
+  if (currentRole === 'admin') return true;
+  if (!currentUser) return false;
+  return p.uploadedByUid && p.uploadedByUid === currentUser.uid;
+}
+
 function renderPhotoGrid(photos) {
   const grid = document.getElementById('photoGrid');
-  const canDelete = currentRole === 'admin' || currentRole === 'technician';
   if (!photos.length) {
     grid.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:24px;grid-column:1/-1">No photos yet.</div>';
     return;
@@ -2431,7 +2460,7 @@ function renderPhotoGrid(photos) {
     <div class="photo-thumb" onclick="openLightbox(${i})">
       <img src="${p.url}" alt="photo ${i+1}">
       <div class="photo-meta">${p.by || ''}${p.by && p.ts ? ' · ' : ''}${p.ts ? new Date(p.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : ''}</div>
-      ${canDelete ? `<button class="photo-del" onclick="event.stopPropagation();deletePhoto(${i})" title="Delete">✕</button>` : ''}
+      ${canDeletePhoto(p) ? `<button class="photo-del" onclick="event.stopPropagation();deletePhoto(${i})" title="Delete">✕</button>` : ''}
     </div>`).join('');
 }
 
@@ -2469,15 +2498,33 @@ function handlePhotoFile(event) {
   msg.style.color = '#aaa';
   msg.textContent = 'Compressing…';
   compressImage(file, 1200, 0.75).then(url => {
+    const newPhoto = {
+      url,
+      ts: Date.now(),
+      by: document.getElementById('userName').textContent || '',
+      uploadedByUid: currentUser ? currentUser.uid : null
+    };
+    if (photoContext.mode === 'request') {
+      firebase.database().ref('requests/' + photoContext.reqKey + '/photos').once('value').then(snap => {
+        const photos = snap.val() || [];
+        photos.push(newPhoto);
+        return firebase.database().ref('requests/' + photoContext.reqKey + '/photos').set(photos).then(() => {
+          renderPhotoGrid(photos);
+          msg.style.color = '#4caf50';
+          msg.textContent = '✓ Photo added.';
+          setTimeout(() => { msg.textContent = ''; }, 2000);
+        });
+      }).catch(() => {
+        msg.style.color = '#e94560';
+        msg.textContent = 'Failed to save photo.';
+      });
+      return;
+    }
     const d = getDayData(photoContext.dayKey);
     const job = d.jobs[photoContext.jobIdx];
     if (!job) return;
     if (!job.photos) job.photos = [];
-    job.photos.push({
-      url,
-      ts: Date.now(),
-      by: document.getElementById('userName').textContent || ''
-    });
+    job.photos.push(newPhoto);
     persistState();
     renderPhotoGrid(job.photos);
     renderDay();
@@ -2492,6 +2539,16 @@ function handlePhotoFile(event) {
 
 function deletePhoto(idx) {
   if (!confirm('Remove this photo?')) return;
+  if (photoContext.mode === 'request') {
+    firebase.database().ref('requests/' + photoContext.reqKey + '/photos').once('value').then(snap => {
+      const photos = snap.val() || [];
+      photos.splice(idx, 1);
+      return firebase.database().ref('requests/' + photoContext.reqKey + '/photos').set(photos);
+    }).then(() => {
+      openPhotosForRequest(photoContext.reqKey); // refresh
+    }).catch(e => alert('Failed: ' + e.message));
+    return;
+  }
   const d = getDayData(photoContext.dayKey);
   const job = d.jobs[photoContext.jobIdx];
   if (!job || !job.photos) return;
