@@ -211,7 +211,7 @@
   .role-salesman .btn-edit-job{display:none}
   .role-salesman .btn-del-week{display:none}
   .role-salesman .btn-copy{display:none}
-  .role-salesman .btn-summary{display:none}
+  /* salesman can see their own summary */
   .role-salesman .btn-load{display:none}
   .role-salesman .btn-backup{display:none}
   .role-salesman .btn-pdf{display:none}
@@ -2166,15 +2166,23 @@ function copyWA() {
 }
 
 // ---- Monthly Summary ----
+function isOwnIBJob(job) {
+  if (!job.internalBilling) return false;
+  if (currentRole === 'admin') return true;
+  if (job.salesmanUid && currentUser) return job.salesmanUid === currentUser.uid;
+  return job.salesman === document.getElementById('userName').textContent;
+}
+
 function openSummary() {
   const sel = document.getElementById('summaryMonth');
   sel.innerHTML = '';
-  // Collect all months that have internal billing jobs
+  document.querySelector('#summaryBg h2').textContent = currentRole === 'salesman' ? '📊 My Billing Summary' : '📊 Internal Billing';
+  // Collect months that have relevant jobs
   const months = new Set();
   Object.keys(state.schedule).forEach(dateKey => {
     const day = getDayData(dateKey);
-    if ((day.jobs || []).some(j => j.internalBilling)) {
-      months.add(dateKey.slice(0, 7)); // YYYY-MM
+    if ((day.jobs || []).some(j => isOwnIBJob(j))) {
+      months.add(dateKey.slice(0, 7));
     }
   });
   if (months.size === 0) {
@@ -2196,12 +2204,12 @@ function renderSummary() {
   const content = document.getElementById('summaryContent');
   if (!month) { content.innerHTML = '<div class="summary-empty">No data.</div>'; return; }
 
-  // Collect all IB jobs for this month
+  // Collect relevant IB jobs for this month
   const bySalesman = {};
   Object.keys(state.schedule).forEach(dateKey => {
     if (!dateKey.startsWith(month)) return;
     const day = getDayData(dateKey);
-    (day.jobs || []).filter(j => j.internalBilling).forEach(job => {
+    (day.jobs || []).filter(j => isOwnIBJob(j)).forEach(job => {
       const key = job.salesman || '(No salesman)';
       if (!bySalesman[key]) bySalesman[key] = [];
       bySalesman[key].push({ date: dateKey, customer: job.customer, desc: job.desc, amount: job.ibAmount || 0 });
@@ -2215,7 +2223,36 @@ function renderSummary() {
   }
 
   let grandTotal = 0;
-  let rows = salesmen.map(sm => {
+  let rows = '';
+
+  if (currentRole === 'salesman') {
+    // Salesman view: flat list of own jobs, no salesman column
+    const myJobs = Object.values(bySalesman).flat();
+    myJobs.sort((a, b) => a.date.localeCompare(b.date));
+    const total = myJobs.reduce((s, j) => s + j.amount, 0);
+    grandTotal = total;
+    rows = myJobs.map(j => {
+      const d = new Date(j.date);
+      return `<tr>
+        <td style="color:#aaa;white-space:nowrap">${d.getDate()}/${d.getMonth()+1}</td>
+        <td style="color:#ccc">${j.customer || '—'}${j.desc ? `<div style="font-size:11px;color:#666;margin-top:2px">${j.desc}</div>` : ''}</td>
+        <td style="text-align:right;color:#f39c12;font-weight:600;white-space:nowrap">${j.amount > 0 ? 'RM '+j.amount.toLocaleString('en',{minimumFractionDigits:2}) : '—'}</td>
+      </tr>`;
+    }).join('');
+    content.innerHTML = `
+      <table class="summary-table">
+        <thead><tr><th>Date</th><th>Job</th><th style="text-align:right">Amount</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 16px;background:#0f3460;border-radius:8px;border:2px solid #f39c12">
+        <span style="font-weight:700;color:#f39c12;font-size:14px">TOTAL (${myJobs.length} job${myJobs.length!==1?'s':''})</span>
+        <span style="font-weight:700;color:#f39c12;font-size:16px">RM ${total.toLocaleString('en',{minimumFractionDigits:2})}</span>
+      </div>`;
+    return;
+  }
+
+  // Admin view: grouped by salesman
+  rows = salesmen.map(sm => {
     const jobs = bySalesman[sm];
     const total = jobs.reduce((s, j) => s + j.amount, 0);
     grandTotal += total;
