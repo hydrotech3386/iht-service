@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#16213e">
+<title>Service Schedule — Hydrotech</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#1a1a2e;color:#e0e0e0;min-height:100vh}
+  header{background:#16213e;padding:12px 20px;padding-top:max(12px,calc(env(safe-area-inset-top) + 8px));display:flex;align-items:center;gap:16px;border-bottom:2px solid #0f3460;flex-wrap:wrap}
+  header h1{font-size:18px;color:#e94560;font-weight:700;white-space:nowrap}
+  .week-nav{display:flex;align-items:center;gap:8px;margin-left:auto}
+  .week-nav button{background:#0f3460;border:none;color:#e0e0e0;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px}
+  .week-nav button:hover{background:#e94560}
+  .week-label{font-size:13px;color:#e0e0e0;min-width:160px;text-align:center;font-weight:600}
+  .rev-box{display:flex;align-items:center;gap:6px;font-size:13px}
+  .rev-box input{width:44px;background:#0f3460;border:1px solid #333;color:#fff;border-radius:4px;padding:4px 6px;text-align:center}
+  .toolbar{background:#16213e;padding:8px 20px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid #0f3460}
+  .toolbar button{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600}
+  .btn-add{background:#27ae60;color:#fff}
+  .btn-add:hover{background:#1e8449}
+  .btn-copy{background:#2980b9;color:#fff}
+  .btn-copy:hover{background:#1a6fa8}
+  .btn-save{background:#8e44ad;color:#fff}
+  .btn-save:hover{background:#6c3483}
+  .btn-load{background:#d35400;color:#fff}
+  .btn-load:hover{background:#a04000}
+  .btn-del-week{background:#c0392b;color:#fff}
+  .btn-del-week:hover{background:#922b21}
+  .days-tabs{display:flex;gap:4px;padding:12px 20px 0;border-bottom:2px solid #0f3460;background:#1a1a2e;flex-wrap:wrap}
+  .day-tab{padding:8px 18px;border-radius:6px 6px 0 0;cursor:pointer;font-size:13px;font-weight:600;border:1px solid #2a4a7f;border-bottom:none;background:#1e2d4a;color:#ccc;transition:all .2s}
+  .day-tab.active{background:#e94560;color:#fff;border-color:#e94560;box-shadow:0 -2px 8px rgba(233,69,96,.45)}
+  .day-tab.has-jobs{color:#27ae60}
+  .day-tab.active.has-jobs{color:#fff}
+  .day-tab.holiday{color:#e94560}
+  .day-tab.active.holiday{background:#e94560;color:#fff}
+  .content{padding:20px;max-width:900px}
+  .day-header{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  .day-title{font-size:16px;font-weight:700;color:#e94560}
+  .holiday-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:#aaa}
+  .holiday-toggle input{cursor:pointer}
+  .holiday-label-input{background:#0f3460;border:1px solid #555;color:#fff;border-radius:4px;padding:4px 8px;font-size:13px;width:220px}
+  .jobs-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+  .job-card{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:12px 16px;position:relative}
+  .job-card .job-num{position:absolute;top:10px;left:12px;background:#e94560;color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  .job-card .job-body{margin-left:30px}
+  .job-card .job-team{color:#5dfc8d;font-weight:700;font-size:13px;margin-bottom:4px}
+  .job-card .job-customer{font-size:13px;color:#fff}
+  .job-card .job-customer span.contact{color:#4fc3f7}
+  .job-card .job-desc{font-size:12px;color:#bbb;margin-top:3px}
+  .job-card .job-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px}
+  .job-actions button{background:#0f3460;border:none;color:#aaa;width:26px;height:26px;border-radius:4px;cursor:pointer;font-size:12px}
+  .job-actions button:hover{background:#e94560;color:#fff}
+  .btn-comment{background:#1a3a5c!important;border:1px solid #2980b9!important;color:#4fc3f7!important;position:relative}
+  .btn-comment:hover{background:#2980b9!important;color:#fff!important}
+  .comment-badge{position:absolute;top:-5px;right:-5px;background:#e94560;color:#fff;border-radius:50%;width:14px;height:14px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .empty-day{color:#555;font-size:13px;padding:20px 0;text-align:center}
+
+  /* Comment modal */
+  .comment-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto;margin:12px 0;padding-right:2px}
+  .comment-item{background:#0f3460;border-radius:8px;padding:10px 12px;position:relative}
+  .comment-text{font-size:13px;color:#e0e0e0;line-height:1.4;white-space:pre-wrap;padding-right:52px}
+  .comment-time{font-size:10px;color:#555;margin-top:4px}
+  .comment-actions{position:absolute;top:8px;right:8px;display:flex;gap:4px;opacity:0;transition:opacity .15s}
+  .comment-item:hover .comment-actions{opacity:1}
+  .comment-actions button{background:#1a1a2e;border:1px solid #333;color:#aaa;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px}
+  .comment-actions button:hover{background:#e94560;color:#fff;border-color:#e94560}
+  .comment-edit-textarea{width:100%;background:#0a2540;border:1px solid #2980b9;color:#fff;border-radius:6px;padding:6px 8px;font-size:13px;resize:none;min-height:56px;font-family:inherit;margin-bottom:6px}
+  .comment-edit-row{display:flex;gap:6px}
+  .comment-edit-row button{padding:5px 12px;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600}
+  .comment-input-row{display:flex;gap:8px;margin-top:4px}
+  .comment-input-row textarea{flex:1;background:#0f3460;border:1px solid #333;color:#fff;border-radius:6px;padding:8px 10px;font-size:13px;resize:none;height:60px;font-family:inherit}
+  .comment-input-row textarea:focus{outline:none;border-color:#2980b9}
+  .comment-send{background:#2980b9;border:none;color:#fff;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;align-self:flex-end}
+  .comment-send:hover{background:#1a6fa8}
+  .comment-empty{color:#555;font-size:12px;text-align:center;padding:16px 0}
+
+  /* Modal */
+  .modal-bg{display:-webkit-flex;display:flex;position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(0,0,0,.7);z-index:100;-webkit-align-items:center;align-items:center;-webkit-justify-content:center;justify-content:center;visibility:hidden;pointer-events:none;opacity:0;transition:opacity .2s}
+  .modal-bg.open{visibility:visible;pointer-events:auto;opacity:1}
+  .modal{background:#16213e;border:1px solid #0f3460;border-radius:10px;padding:24px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .modal h2{font-size:15px;color:#e94560;margin-bottom:16px}
+  .form-row{margin-bottom:12px}
+  .form-row label{display:block;font-size:12px;color:#aaa;margin-bottom:4px}
+  .form-row input,.form-row textarea,.form-row select{width:100%;background:#0f3460;border:1px solid #333;color:#fff;border-radius:6px;padding:8px 10px;font-size:13px}
+  .form-row textarea{resize:vertical;min-height:60px;font-family:inherit}
+  .form-row input:focus,.form-row textarea:focus{outline:none;border-color:#e94560}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  .modal-actions button{padding:8px 18px;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px}
+  .btn-confirm{background:#27ae60;color:#fff}
+  .btn-cancel{background:#555;color:#fff}
+
+  /* History panel */
+  .history-panel{position:fixed;right:-320px;top:0;bottom:0;width:300px;background:#16213e;border-left:2px solid #0f3460;z-index:150;transition:right .3s;padding:16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .history-panel.open{right:0}
+  .history-panel h3{color:#e94560;margin-bottom:12px;font-size:14px}
+  .history-item{padding:8px 10px;border:1px solid #0f3460;border-radius:6px;cursor:pointer;margin-bottom:6px;font-size:12px;color:#aaa}
+  .history-item:hover{background:#0f3460;color:#fff}
+  .history-item .hi-week{color:#fff;font-weight:600}
+  .history-item .hi-jobs{color:#5dfc8d;font-size:11px}
+  .close-hist{float:right;background:none;border:none;color:#aaa;cursor:pointer;font-size:16px}
+
+  /* WhatsApp preview */
+  .wa-preview{background:#000;border:1px solid #333;border-radius:8px;padding:16px;font-family:'Courier New',monospace;font-size:12px;white-space:pre-wrap;color:#e0e0e0;max-height:400px;overflow-y:auto;margin-top:12px}
+  .copy-success{color:#27ae60;font-size:12px;margin-left:8px;opacity:0;transition:opacity .3s}
+  .copy-success.show{opacity:1}
+
+  /* Member checkboxes */
+  .member-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .member-chip{display:flex;align-items:center;gap:5px;background:#0f3460;border:1px solid #333;border-radius:20px;padding:5px 10px;cursor:pointer;user-select:none;font-size:13px;transition:all .15s}
+  .member-chip:hover{border-color:#e94560}
+  .member-chip.checked{background:#e94560;border-color:#e94560;color:#fff;font-weight:700}
+  .member-chip input{display:none}
+  .member-chip.absent{opacity:0.4;cursor:not-allowed;pointer-events:none}
+  .member-chip.assigned:not(.checked){background:#1a3a1a;border-color:#27ae60;color:#5dfc8d}
+  .manage-members{margin-top:8px;font-size:11px;color:#666;cursor:pointer;text-decoration:underline}
+  .manage-members:hover{color:#aaa}
+  .member-manage-row{display:flex;gap:6px;margin-top:8px;align-items:center}
+  .member-manage-row input{flex:1;background:#0f3460;border:1px solid #333;color:#fff;border-radius:6px;padding:6px 8px;font-size:12px}
+  .member-manage-row button{background:#27ae60;border:none;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px;white-space:nowrap}
+  .member-remove-list{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+  .member-remove-chip{display:flex;align-items:center;gap:4px;background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:3px 8px;font-size:11px;color:#aaa}
+  .member-remove-chip button{background:none;border:none;color:#e94560;cursor:pointer;font-size:12px;padding:0;line-height:1}
+
+  /* Internal billing badge */
+  .ib-badge{display:inline-block;background:#f39c12;color:#000;font-size:10px;font-weight:700;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;letter-spacing:.5px}
+  .job-card.internal-billing{border-color:#f39c12;border-left:3px solid #f39c12}
+  .ib-toggle{display:flex;align-items:center;gap:8px;background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:8px 12px;cursor:pointer;user-select:none;margin-top:4px;font-size:13px}
+  .ib-toggle:hover{border-color:#f39c12}
+  .ib-toggle.on{background:#f39c12;border-color:#f39c12;color:#000;font-weight:700}
+  .ib-toggle input{display:none}
+
+  /* Monthly summary modal */
+  .summary-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+  .summary-table th{background:#0f3460;padding:8px 10px;text-align:left;color:#aaa;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .summary-table td{padding:8px 10px;border-bottom:1px solid #0f3460;vertical-align:top}
+  .summary-table tr:hover td{background:#1a1a2e}
+  .summary-table .salesman-name{color:#5dfc8d;font-weight:700}
+  .summary-table .job-item{margin-bottom:4px;color:#ccc;font-size:12px}
+  .summary-table .job-item .job-date{color:#666;font-size:11px;margin-left:4px}
+  .summary-table .total-row td{font-weight:700;color:#f39c12;border-top:2px solid #f39c12;border-bottom:none}
+  .month-selector{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .month-selector select{background:#0f3460;border:1px solid #333;color:#fff;border-radius:6px;padding:6px 10px;font-size:13px}
+  .summary-empty{color:#555;font-size:13px;padding:24px 0;text-align:center}
+  .btn-summary{background:#f39c12;color:#000}
+  .btn-summary:hover{background:#d68910}
+  .btn-backup{background:#8e44ad;color:#fff}
+  .btn-backup:hover{filter:brightness(1.15)}
+  .btn-pdf{background:#1a6fa8;color:#fff}
+  .btn-pdf:hover{background:#155d8f}
+
+  /* Auth overlay */
+  .auth-overlay{position:fixed;inset:0;background:#1a1a2e;z-index:999;display:flex;align-items:center;justify-content:center;visibility:hidden;opacity:0;transition:opacity .3s}
+  .auth-overlay.open{visibility:visible;opacity:1}
+  .auth-card{background:#16213e;border:1px solid #0f3460;border-radius:12px;padding:32px 28px;width:100%;max-width:340px;text-align:center}
+  .auth-card h2{color:#e94560;font-size:18px;margin-bottom:6px}
+  .auth-card p{color:#888;font-size:13px;margin-bottom:20px}
+  .auth-input{width:100%;background:#0f3460;border:1px solid #333;color:#fff;border-radius:8px;padding:10px 14px;font-size:15px;text-align:center;letter-spacing:2px;margin-bottom:10px}
+  .auth-input:focus{outline:none;border-color:#e94560}
+  .auth-error{color:#e94560;font-size:12px;height:16px;margin-bottom:10px}
+  .auth-btn{width:100%;background:#e94560;border:none;color:#fff;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:14px}
+  .auth-btn:hover{background:#c0392b}
+  .auth-view-link{color:#555;font-size:12px;text-decoration:none}
+  .auth-view-link:hover{color:#aaa}
+  @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+  .shake{animation:shake .35s ease}
+
+  /* View-only mode */
+  .view-only .toolbar{display:none}
+  .view-only .rev-box input{pointer-events:none;border-color:transparent;background:transparent}
+  .view-only .btn-edit-job{display:none}
+  .view-only .holiday-toggle input,.view-only .holiday-toggle label[for]{pointer-events:none}
+  .view-only .chip-btn{display:none}
+  .view-only .leave-label{display:none}
+  .view-only .manage-members,.view-only .manage-salesmen{display:none}
+  .view-only-badge{display:none;background:#2980b9;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px;letter-spacing:.5px;white-space:nowrap}
+  .view-only .view-only-badge{display:inline-block}
+
+  /* Sync status */
+  .sync-status{display:flex;align-items:center;gap:5px;font-size:11px;color:#aaa;white-space:nowrap}
+  .sync-dot{width:8px;height:8px;border-radius:50%;background:#555;flex-shrink:0}
+  .sync-dot.synced{background:#27ae60}
+  .sync-dot.syncing{background:#f39c12;animation:pulse .8s infinite}
+  .sync-dot.offline{background:#e94560}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  /* Absence row */
+  .leave-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px;background:#16213e;border:1px solid #0f3460;border-radius:8px;margin-bottom:12px}
+  .leave-label{font-size:11px;color:#aaa;white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;margin-right:2px}
+  .leave-chip{display:inline-flex;align-items:center;gap:0;background:#0f3460;border:1px solid #333;border-radius:16px;overflow:hidden;font-size:12px;font-weight:600;cursor:default;transition:border-color .15s}
+  .leave-chip:hover{border-color:#888}
+  .leave-chip .chip-name{padding:5px 9px;color:#ccc}
+  .leave-chip .chip-btn{padding:5px 8px;border:none;background:transparent;color:#666;cursor:pointer;font-size:11px;font-weight:700;border-left:1px solid #333;transition:all .15s;white-space:nowrap}
+  .leave-chip .chip-btn:hover{background:#0f3460;color:#fff}
+  .leave-chip.leave .chip-name{color:#e67e22}
+  .leave-chip.leave{border-color:#e67e22}
+  .leave-chip.leave .chip-btn.btn-leave{background:#e67e22;color:#fff}
+  .leave-chip.mc .chip-name{color:#9b59b6}
+  .leave-chip.mc{border-color:#9b59b6}
+  .leave-chip.mc .chip-btn.btn-mc{background:#9b59b6;color:#fff}
+  .absence-badge{font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle}
+  .absence-badge.leave{background:#e67e22;color:#fff}
+  .absence-badge.mc{background:#9b59b6;color:#fff}
+
+  /* ── Mobile ── */
+  @media (max-width: 640px) {
+    /* Prevent iOS input zoom */
+    input, textarea, select { font-size: 16px !important; }
+
+    /* Full-height flex column — day tabs always visible, content scrolls */
+    html, body { height: 100%; }
+    body { display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; }
+    header { -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .toolbar { -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .days-tabs { -webkit-flex-shrink: 0; flex-shrink: 0; }
+    .content { -webkit-flex: 1; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 12px max(20px, calc(env(safe-area-inset-bottom) + 16px)); }
+
+    /* Header: compact two rows, preserve Dynamic Island / notch safe area */
+    header { padding: max(8px, calc(env(safe-area-inset-top) + 4px)) 14px 8px; gap: 6px; }
+    header h1 { font-size: 14px; }
+    .week-nav { margin-left: 0; width: 100%; justify-content: space-between; }
+    .week-label { min-width: 0; flex: 1; font-size: 12px; color: #fff; text-align: center; }
+    .rev-box { font-size: 12px; }
+    .rev-box input { width: 38px; padding: 3px 4px; }
+
+    /* Toolbar: single scrollable row */
+    .toolbar { padding: 6px 10px; gap: 6px; display: -webkit-flex; display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .toolbar::-webkit-scrollbar { display: none; }
+    .toolbar button { padding: 10px 12px; font-size: 12px; white-space: nowrap; flex-shrink: 0; border-radius: 8px; }
+
+    /* Day tabs: all 6 visible in one row */
+    .days-tabs { flex-wrap: nowrap; padding: 8px 10px 0; gap: 4px; }
+    .day-tab { flex: 1 1 0; padding: 8px 2px; font-size: 11px; min-width: 0; text-align: center; }
+
+    /* Content */
+    .day-header { gap: 8px; margin-bottom: 12px; }
+    .day-title { font-size: 14px; }
+    .holiday-label-input { width: 160px; font-size: 14px !important; }
+
+    /* Job cards — bigger touch targets */
+    .job-card { padding: 12px 12px 12px 12px; }
+    .job-card .job-num { width: 24px; height: 24px; font-size: 11px; top: 12px; left: 10px; }
+    .job-card .job-body { margin-left: 32px; margin-right: 80px; }
+    .job-card .job-team { font-size: 13px; }
+    .job-card .job-customer { font-size: 13px; line-height: 1.4; }
+    .job-card .job-desc { font-size: 12px; }
+    .job-card .job-actions { gap: 6px; top: 8px; right: 8px; }
+    .job-actions button { width: 34px; height: 34px; font-size: 14px; border-radius: 6px; }
+
+    /* Modal: bottom sheet */
+    .modal-bg { -webkit-align-items: flex-end; align-items: flex-end; }
+    .modal { border-radius: 16px 16px 0 0; max-width: 100%; max-height: 92vh; padding: 20px 16px calc(32px + env(safe-area-inset-bottom)); margin: 0; }
+    .modal h2 { font-size: 15px; margin-bottom: 14px; }
+    .form-row { margin-bottom: 14px; }
+    .form-row label { font-size: 13px; }
+    .modal-actions { gap: 10px; }
+    .modal-actions button { flex: 1; padding: 13px; font-size: 14px; border-radius: 10px; }
+
+    /* Member chips — larger touch target */
+    .member-chip { padding: 8px 14px; font-size: 14px; }
+    .manage-members { font-size: 13px; padding: 4px 0; }
+    .member-manage-row input { font-size: 15px !important; padding: 10px; }
+    .member-manage-row button { padding: 10px 14px; font-size: 13px; }
+    .member-remove-chip { padding: 5px 10px; font-size: 12px; }
+    .member-remove-chip button { font-size: 14px; width: 20px; height: 20px; }
+
+    /* IB toggle */
+    .ib-toggle { padding: 12px 14px; font-size: 14px; }
+
+    /* History panel: full width */
+    .history-panel { width: 100%; right: -100%; border-left: none; border-top: 2px solid #0f3460; padding-top: max(16px, calc(env(safe-area-inset-top) + 12px)); padding-bottom: max(16px, calc(env(safe-area-inset-bottom) + 12px)); }
+    .history-panel.open { right: 0; }
+    .history-item { padding: 12px; font-size: 13px; }
+    .history-item .hi-week { font-size: 13px; }
+
+    /* WA preview */
+    .wa-preview { font-size: 11px; max-height: 280px; }
+
+    /* Comment modal */
+    .comment-list { max-height: 200px; }
+    .comment-input-row textarea { font-size: 15px !important; }
+    .comment-actions { opacity: 1; }
+    .comment-actions button { padding: 4px 10px; font-size: 13px; }
+    .comment-text { padding-right: 72px; }
+
+    /* Summary table: stack columns */
+    .summary-table th:nth-child(2), .summary-table td:nth-child(2) { display: none; }
+    .summary-table th, .summary-table td { padding: 8px 6px; font-size: 12px; }
+    .month-selector select { font-size: 15px !important; padding: 8px; }
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <h2>🔒 Editor Access</h2>
+    <p>Enter password to edit the schedule</p>
+    <input class="auth-input" type="password" id="authInput" placeholder="Password"
+      onkeydown="if(event.key==='Enter')submitPassword()">
+    <div class="auth-error" id="authError"></div>
+    <button class="auth-btn" onclick="submitPassword()">Unlock</button>
+    <a class="auth-view-link" href="?view">View only instead →</a>
+  </div>
+</div>
+
+
+<header>
+  <h1>⚙ Hydrotech Service Schedule</h1>
+  <span class="view-only-badge">VIEW ONLY</span>
+  <div class="sync-status"><div class="sync-dot syncing" id="syncDot"></div><span id="syncLabel">Connecting...</span></div>
+  <div class="rev-box">Rev <input type="number" id="revNum" value="0" min="0"></div>
+  <div class="week-nav">
+    <button onclick="changeWeek(-1)">◀ Prev</button>
+    <span class="week-label" id="weekLabel"></span>
+    <button onclick="changeWeek(1)">Next ▶</button>
+  </div>
+</header>
+
+<div class="toolbar">
+  <button class="btn-add" onclick="openModal()">+ Add Job</button>
+  <button class="btn-copy" onclick="showWAPreview()">📋 Copy for WhatsApp</button>
+  <button class="btn-summary" onclick="openSummary()">📊 Internal Billing</button>
+  <button class="btn-load" onclick="toggleHistory()">📁 History</button>
+  <button class="btn-del-week" onclick="deleteWeek()">🗑 Delete Week</button>
+  <button class="btn-backup" onclick="exportBackup()">⬇ Backup</button>
+  <button class="btn-backup" onclick="importBackup()" style="background:#6c3483">⬆ Restore</button>
+  <button class="btn-pdf" onclick="exportWeekPDF()">📄 Export PDF</button>
+</div>
+
+<div class="days-tabs" id="daysTabs"></div>
+<div class="content">
+  <div class="day-header">
+    <span class="day-title" id="dayTitle"></span>
+    <div class="holiday-toggle">
+      <input type="checkbox" id="holidayCheck" onchange="toggleHoliday()">
+      <label for="holidayCheck">Public Holiday</label>
+      <input type="text" id="holidayLabel" class="holiday-label-input" placeholder="e.g. LABOUR DAY" style="display:none" oninput="saveHolidayLabel()">
+    </div>
+  </div>
+  <div class="leave-row" id="leaveRow"></div>
+  <div class="jobs-list" id="jobsList"></div>
+</div>
+
+<!-- History Panel -->
+<div class="history-panel" id="historyPanel">
+  <button class="close-hist" onclick="toggleHistory()">✕</button>
+  <h3>📁 Saved Schedules</h3>
+  <div id="historyList"></div>
+</div>
+
+<!-- Add/Edit Job Modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h2 id="modalTitle">Add Job</h2>
+    <div class="form-row">
+      <label>Team Members</label>
+      <div class="member-grid" id="memberGrid"></div>
+      <div class="manage-members" onclick="toggleManageMembers()">+ Manage members</div>
+      <div id="manageMembersPanel" style="display:none">
+        <div class="member-manage-row">
+          <input type="text" id="newMemberName" placeholder="New member name" onkeydown="if(event.key==='Enter')addMember()">
+          <button onclick="addMember()">Add</button>
+        </div>
+        <div class="member-remove-list" id="memberRemoveList"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Customer / Location</label>
+      <input type="text" id="fCustomer" placeholder="e.g. Ms. Yammy or Bumi Proaktif - Gerik">
+    </div>
+    <div class="form-row">
+      <label>Contact Number</label>
+      <input type="text" id="fContact" placeholder="012-3456789">
+    </div>
+    <div class="form-row">
+      <label>Address</label>
+      <input type="text" id="fAddress" placeholder="No. 2, Jalan ABC, Ipoh">
+    </div>
+    <div class="form-row">
+      <label>Salesman (in brackets)</label>
+      <div class="member-grid" id="salesmanGrid"></div>
+      <div class="manage-members" onclick="toggleManageSalesmen()">+ Manage salesmen</div>
+      <div id="manageSalesmenPanel" style="display:none">
+        <div class="member-manage-row">
+          <input type="text" id="newSalesmanName" placeholder="New salesman name" onkeydown="if(event.key==='Enter')addSalesman()">
+          <button onclick="addSalesman()">Add</button>
+        </div>
+        <div class="member-remove-list" id="salesmanRemoveList"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Job Description</label>
+      <textarea id="fDesc" placeholder="Describe the work to be done..."></textarea>
+    </div>
+    <div class="form-row">
+      <label class="ib-toggle" id="ibToggle" onclick="toggleIB()">
+        <input type="checkbox" id="fInternalBilling">
+        <span id="ibLabel">Internal Billing</span>
+      </label>
+    </div>
+    <div class="form-row" id="ibAmountRow" style="display:none">
+      <label>Billing Amount (RM)</label>
+      <input type="number" id="fIBAmount" placeholder="0.00" min="0" step="0.01">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-confirm" onclick="saveJob()">Save Job</button>
+    </div>
+  </div>
+</div>
+
+<!-- WhatsApp Preview Modal -->
+<div class="modal-bg" id="waBg">
+  <div class="modal" style="max-width:600px">
+    <h2>WhatsApp Preview</h2>
+    <div class="wa-preview" id="waText"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('waBg').classList.remove('open')">Close</button>
+      <button class="btn-copy" onclick="copyWA()">📋 Copy Text</button>
+      <span class="copy-success" id="copyOk">Copied!</span>
+    </div>
+  </div>
+</div>
+
+<!-- Comment Modal -->
+<div class="modal-bg" id="commentBg">
+  <div class="modal" style="max-width:500px">
+    <h2 id="commentTitle">💬 Comments</h2>
+    <div class="comment-list" id="commentList"></div>
+    <div class="comment-input-row">
+      <textarea id="commentInput" placeholder="Add a comment…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addComment()}"></textarea>
+      <button class="comment-send" onclick="addComment()">Send</button>
+    </div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="btn-cancel" onclick="document.getElementById('commentBg').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Monthly Summary Modal -->
+<div class="modal-bg" id="summaryBg">
+  <div class="modal" style="max-width:680px">
+    <h2>📊 Internal Billing</h2>
+    <div class="month-selector">
+      <select id="summaryMonth" onchange="renderSummary()"></select>
+    </div>
+    <div id="summaryContent"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('summaryBg').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const STORAGE_KEY = 'hydrotech_schedule_v1';
+const VIEW_ONLY = new URLSearchParams(window.location.search).has('view');
+const EDITOR_PASS = 'iht2025'; // change this to your preferred password
+
+// ---- Auth ----
+function checkAuth() {
+  if (VIEW_ONLY) return;
+  if (sessionStorage.getItem('iht_auth') === '1') return;
+  document.getElementById('authOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('authInput').focus(), 100);
+}
+
+function submitPassword() {
+  const val = document.getElementById('authInput').value;
+  if (val === EDITOR_PASS) {
+    sessionStorage.setItem('iht_auth', '1');
+    document.getElementById('authOverlay').classList.remove('open');
+  } else {
+    const input = document.getElementById('authInput');
+    input.value = '';
+    input.classList.add('shake');
+    document.getElementById('authError').textContent = 'Incorrect password';
+    setTimeout(() => { input.classList.remove('shake'); }, 400);
+    setTimeout(() => input.focus(), 50);
+  }
+}
+
+let state = {
+  weekStart: getMonday(new Date()),
+  revNum: 1,
+  revNums: {},
+  members: ['Farid','Heidi','Annas','Akram','Izzudin'],
+  salesmen: ['Jack','Kamal','Helmi','Faris'],
+  schedule: {} // key: 'YYYY-MM-DD' => { jobs:[], holiday:false, holidayLabel:'' }
+};
+
+let editingJob = null; // {dayKey, jobIdx}
+let currentDay = null;
+
+function getMonday(d) {
+  const dt = new Date(d);
+  const day = dt.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  dt.setHours(0,0,0,0);
+  return dt;
+}
+
+function getDayDate(weekStart, dayIdx) {
+  const d = new Date(weekStart);
+  d.setDate(d.getDate() + dayIdx);
+  return d;
+}
+
+function fmtDate(d) {
+  return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+}
+
+function isoDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+
+function weekKey(weekStart) {
+  return isoDate(weekStart);
+}
+
+function migrateTzKeys() {
+  // Old isoDate() used toISOString() (UTC). For UTC+ timezones, local midnight = UTC previous day,
+  // so all stored keys are 1 day behind the correct local date. Shift them all +1 day once.
+  if (state.tzMigrated) return;
+  if (new Date().getTimezoneOffset() >= 0) { // UTC or west of UTC — no issue
+    state.tzMigrated = true;
+    return;
+  }
+  const oldSchedule = state.schedule;
+  const newSchedule = {};
+  Object.keys(oldSchedule).forEach(key => {
+    // Parse key as UTC date, then +1 day in local time to get correct local date
+    const d = new Date(key); // UTC midnight
+    const shifted = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+    const newKey = isoDate(shifted);
+    if (newSchedule[newKey]) {
+      const a = Array.isArray(newSchedule[newKey].jobs) ? newSchedule[newKey].jobs : Object.values(newSchedule[newKey].jobs||{});
+      const b = Array.isArray(oldSchedule[key].jobs) ? oldSchedule[key].jobs : Object.values(oldSchedule[key].jobs||{});
+      newSchedule[newKey].jobs = [...a, ...b];
+    } else {
+      newSchedule[newKey] = JSON.parse(JSON.stringify(oldSchedule[key]));
+    }
+  });
+  state.schedule = newSchedule;
+  state.tzMigrated = true;
+  persistState();
+}
+
+function applyStateData(data) {
+  state = data;
+  state.weekStart = getMonday(new Date()); // always open on current week
+  if (!state.members) state.members = ['Farid','Heidi','Annas','Akram','Izzudin'];
+  if (!state.salesmen) state.salesmen = ['Jack','Kamal','Helmi','Faris'];
+  if (!state.schedule || typeof state.schedule !== 'object') state.schedule = {};
+  if (!state.revNums || typeof state.revNums !== 'object') state.revNums = {};
+  migrateTzKeys();
+  // Default currentDay to today if today is within the current week
+  const _today = isoDate(new Date());
+  const _mon = isoDate(getDayDate(state.weekStart, 0));
+  const _sat = isoDate(getDayDate(state.weekStart, 5));
+  currentDay = (_today >= _mon && _today <= _sat) ? _today : _mon;
+  document.getElementById('revNum').value = state.revNums[weekKey(state.weekStart)] || 0;
+}
+
+function init() {
+  checkAuth();
+  if (VIEW_ONLY) document.body.classList.add('view-only');
+
+  // 1. Load localStorage immediately so UI shows fast
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) applyStateData(JSON.parse(saved));
+    else migrateTzKeys();
+  } catch(e) {
+    console.error('State load error:', e);
+    try { localStorage.removeItem(STORAGE_KEY); } catch(_) {}
+    migrateTzKeys();
+  }
+  if (!currentDay) {
+    const _t = isoDate(new Date());
+    const _m = isoDate(getDayDate(state.weekStart, 0));
+    const _s = isoDate(getDayDate(state.weekStart, 5));
+    currentDay = (_t >= _m && _t <= _s) ? _t : _m;
+  }
+  document.getElementById('revNum').value = state.revNums[weekKey(state.weekStart)] || 0;
+  document.getElementById('revNum').addEventListener('change', e => { state.revNums[weekKey(state.weekStart)] = parseInt(e.target.value)||0; persistState(); });
+  try { render(); } catch(e) { console.error('Render error:', e); }
+
+  // 2. Connect Firebase — sign in anonymously then load
+  initFirebase();
+  if (fbReady) {
+    setSyncStatus('syncing');
+    firebase.auth().signInAnonymously().then(() => {
+      if (VIEW_ONLY) {
+        // Live listener — auto-updates when editors save
+        fbRef.on('value', snapshot => {
+          const fbData = snapshot.val();
+          if (fbData) {
+            try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
+            try { render(); } catch(e) {}
+            // Refresh comment modal if open
+            if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
+              const d = getDayData(commentContext.dayKey);
+              const job = d.jobs[commentContext.jobIdx];
+              if (job) renderCommentList(job.comments || []);
+            }
+          }
+          setSyncStatus('synced');
+        }, () => setSyncStatus('offline'));
+      } else {
+        // Editor: live listener so comment updates from view-only users arrive in real-time
+        fbRef.on('value', snapshot => {
+          const fbData = snapshot.val();
+          if (fbData) {
+            const localTs = state.lastModified || 0;
+            const fbTs = fbData.lastModified || 0;
+            if (fbTs > localTs) {
+              const savedWeekStart = state.weekStart;
+              const savedCurrentDay = currentDay;
+              try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
+              // Preserve week the editor is currently viewing
+              state.weekStart = savedWeekStart;
+              currentDay = savedCurrentDay;
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(fbData));
+              try { render(); } catch(e) {}
+              // Refresh comment modal if open
+              if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
+                const d = getDayData(commentContext.dayKey);
+                const job = d.jobs[commentContext.jobIdx];
+                if (job) renderCommentList(job.comments || []);
+              }
+            }
+          }
+          setSyncStatus('synced');
+        }, () => setSyncStatus('offline'));
+      }
+    }).catch(() => setSyncStatus('offline'));
+  } else {
+    setSyncStatus('offline');
+  }
+}
+
+function changeWeek(dir) {
+  const d = new Date(state.weekStart);
+  d.setDate(d.getDate() + dir * 7);
+  state.weekStart = d;
+  currentDay = isoDate(getDayDate(state.weekStart, 0));
+  render();
+  persistState();
+}
+
+function getDayData(dayKey) {
+  if (!state.schedule) state.schedule = {};
+  if (!state.schedule[dayKey] || typeof state.schedule[dayKey] !== 'object' || Array.isArray(state.schedule[dayKey])) {
+    state.schedule[dayKey] = { jobs:[], holiday:false, holidayLabel:'', absence:{} };
+  }
+  const entry = state.schedule[dayKey];
+  if (!Array.isArray(entry.jobs)) {
+    entry.jobs = (entry.jobs && typeof entry.jobs === 'object') ? Object.values(entry.jobs) : [];
+  }
+  // Ensure each job's comments is an array (Firebase converts arrays to objects)
+  entry.jobs.forEach(job => {
+    if (!Array.isArray(job.comments)) {
+      job.comments = (job.comments && typeof job.comments === 'object') ? Object.values(job.comments) : [];
+    }
+  });
+  if (typeof entry.holiday !== 'boolean') entry.holiday = false;
+  if (typeof entry.holidayLabel !== 'string') entry.holidayLabel = '';
+  if (!state.schedule[dayKey].absence) {
+    // migrate old onLeave array
+    const old = state.schedule[dayKey].onLeave || [];
+    state.schedule[dayKey].absence = {};
+    old.forEach(n => { state.schedule[dayKey].absence[n] = 'leave'; });
+    delete state.schedule[dayKey].onLeave;
+  }
+  return state.schedule[dayKey];
+}
+
+function render() {
+  const ws = state.weekStart;
+  const endDate = getDayDate(ws, 5);
+  document.getElementById('weekLabel').textContent = `${fmtDate(ws)} – ${fmtDate(endDate)}`;
+
+  // Tabs
+  const tabs = document.getElementById('daysTabs');
+  tabs.innerHTML = '';
+  let tabErr = null;
+  DAYS.forEach((day, i) => {
+    try {
+      const d = getDayDate(ws, i);
+      const key = isoDate(d);
+      const data = getDayData(key);
+      const hasJobs = (data.jobs || []).length > 0;
+      const btn = document.createElement('button');
+      btn.className = 'day-tab' + (key===currentDay?' active':'') + (hasJobs?' has-jobs':'') + (data.holiday?' holiday':'');
+      btn.innerHTML = `${day.slice(0,3)}<br><small>${d.getDate()}/${d.getMonth()+1}</small>`;
+      btn.onclick = () => { currentDay = key; render(); };
+      tabs.appendChild(btn);
+    } catch(e) { if (!tabErr) tabErr = `Tab${i}: ${e.message}`; }
+  });
+  document.getElementById('weekLabel').textContent = `${fmtDate(ws)} – ${fmtDate(endDate)}${tabErr ? ' ⚠'+tabErr : ''}`;
+  document.getElementById('revNum').value = state.revNums[weekKey(ws)] || 0;
+
+  try { renderDay(); } catch(e) { console.error('renderDay error:', e); }
+}
+
+function setAbsence(name, type) {
+  const data = getDayData(currentDay);
+  if (data.absence[name] === type) {
+    delete data.absence[name]; // toggle off
+  } else {
+    data.absence[name] = type;
+  }
+  persistState();
+  renderLeaveRow();
+  render();
+}
+
+function renderLeaveRow() {
+  const data = getDayData(currentDay);
+  const row = document.getElementById('leaveRow');
+  row.innerHTML = '';
+  if (!state.members.length) return;
+  const lbl = document.createElement('span');
+  lbl.className = 'leave-label';
+  lbl.textContent = 'Absent:';
+  row.appendChild(lbl);
+  state.members.forEach(name => {
+    const status = (data.absence || {})[name] || '';
+    const chip = document.createElement('div');
+    chip.className = 'leave-chip' + (status ? ' ' + status : '');
+    chip.innerHTML = `
+      <span class="chip-name">${name}</span>
+      <button class="chip-btn btn-leave" onclick="setAbsence('${name}','leave')" title="Mark Leave">AL</button>
+      <button class="chip-btn btn-mc" onclick="setAbsence('${name}','mc')" title="Mark MC">MC</button>`;
+    row.appendChild(chip);
+  });
+}
+
+function renderDay() {
+  if (!currentDay) return;
+  const d = new Date(currentDay);
+  const dayName = DAYS[d.getDay()-1] || 'Saturday';
+  document.getElementById('dayTitle').textContent = `${fmtDate(d)} ${dayName}`;
+
+  const data = getDayData(currentDay);
+  document.getElementById('holidayCheck').checked = data.holiday;
+  const lbl = document.getElementById('holidayLabel');
+  lbl.style.display = data.holiday ? 'inline-block' : 'none';
+  lbl.value = data.holidayLabel || '';
+
+  renderLeaveRow();
+
+  const list = document.getElementById('jobsList');
+  list.innerHTML = '';
+
+  if (data.holiday) {
+    renderLeaveRow(); // still show leave on holiday days
+    list.innerHTML = `<div class="empty-day" style="color:#e94560;font-size:15px;font-weight:700">🎉 PUBLIC HOLIDAY${data.holidayLabel ? ' — '+data.holidayLabel : ''}</div>`;
+    return;
+  }
+
+  if (data.jobs.length === 0) {
+    list.innerHTML = '<div class="empty-day">No jobs scheduled. Click "+ Add Job" to add.</div>';
+    return;
+  }
+
+  data.jobs.forEach((job, idx) => {
+    const cmtCount = (job.comments || []).length;
+    const card = document.createElement('div');
+    card.className = 'job-card' + (job.internalBilling ? ' internal-billing' : '');
+    card.innerHTML = `
+      <div class="job-num">${idx+1}</div>
+      <div class="job-body">
+        <div class="job-team">${job.team || ''}${job.internalBilling ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}</div>
+        <div class="job-customer">${job.customer || ''}${job.contact ? ' <span class="contact">'+job.contact+'</span>' : ''}${job.address ? ' '+job.address : ''}${job.salesman ? ' ('+job.salesman+')' : ''}</div>
+        ${job.desc ? `<div class="job-desc">${job.desc}</div>` : ''}
+      </div>
+      <div class="job-actions">
+        <button class="btn-comment" onclick="openComments('${currentDay}',${idx})" title="Comments">💬${cmtCount ? `<span class="comment-badge">${cmtCount}</span>` : ''}</button>
+        <button class="btn-edit-job" onclick="editJob(${idx})" title="Edit">✏</button>
+        <button class="btn-edit-job" onclick="moveJob(${idx},-1)" title="Move Up">▲</button>
+        <button class="btn-edit-job" onclick="moveJob(${idx},1)" title="Move Down">▼</button>
+        <button class="btn-edit-job" onclick="deleteJob(${idx})" title="Delete">✕</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+function toggleHoliday() {
+  const data = getDayData(currentDay);
+  data.holiday = document.getElementById('holidayCheck').checked;
+  persistState();
+  renderDay();
+  render(); // update tab color
+}
+
+function saveHolidayLabel() {
+  const data = getDayData(currentDay);
+  data.holidayLabel = document.getElementById('holidayLabel').value;
+  persistState();
+  render();
+}
+
+function openModal(editIdx) {
+  try {
+  editingJob = editIdx !== undefined ? { dayKey: currentDay, jobIdx: editIdx } : null;
+  const modal = document.getElementById('modalBg');
+  const data = getDayData(currentDay);
+
+  let selectedMembers = [];
+  if (editingJob !== null) {
+    const job = data.jobs[editIdx];
+    selectedMembers = (job.team || '').split(',').map(s => s.trim()).filter(Boolean);
+    document.getElementById('fCustomer').value = job.customer || '';
+    document.getElementById('fContact').value = job.contact || '';
+    document.getElementById('fAddress').value = job.address || '';
+    document.getElementById('fDesc').value = job.desc || '';
+    document.getElementById('modalTitle').textContent = `Edit Job ${editIdx+1}`;
+  } else {
+    selectedMembers = [];
+    document.getElementById('fCustomer').value = '';
+    document.getElementById('fContact').value = '';
+    document.getElementById('fAddress').value = '';
+    document.getElementById('fDesc').value = '';
+    document.getElementById('modalTitle').textContent = 'Add Job';
+  }
+  const isIB = editingJob !== null ? !!data.jobs[editingJob.jobIdx].internalBilling : false;
+  const ibAmt = editingJob !== null ? (data.jobs[editingJob.jobIdx].ibAmount || '') : '';
+  document.getElementById('fInternalBilling').checked = isIB;
+  document.getElementById('fIBAmount').value = ibAmt;
+  document.getElementById('ibAmountRow').style.display = isIB ? 'block' : 'none';
+  const tog = document.getElementById('ibToggle');
+  tog.classList.toggle('on', isIB);
+  document.getElementById('ibLabel').textContent = isIB ? '✔ Internal Billing' : 'Internal Billing';
+  document.getElementById('manageMembersPanel').style.display = 'none';
+  document.getElementById('manageSalesmenPanel').style.display = 'none';
+  renderMemberGrid(selectedMembers);
+  const selectedSalesman = editingJob !== null ? (data.jobs[editingJob.jobIdx].salesman || '') : '';
+  renderSalesmanGrid(selectedSalesman);
+  modal.classList.add('open');
+  document.getElementById('fCustomer').focus();
+  } catch(err) { alert('openModal error: ' + err.message); }
+}
+
+function toggleIB() {
+  const cb = document.getElementById('fInternalBilling');
+  cb.checked = !cb.checked;
+  const tog = document.getElementById('ibToggle');
+  tog.classList.toggle('on', cb.checked);
+  document.getElementById('ibLabel').textContent = cb.checked ? '✔ Internal Billing' : 'Internal Billing';
+  document.getElementById('ibAmountRow').style.display = cb.checked ? 'block' : 'none';
+  if (cb.checked) document.getElementById('fIBAmount').focus();
+}
+
+function renderMemberGrid(selectedMembers) {
+  const grid = document.getElementById('memberGrid');
+  grid.innerHTML = '';
+  const dayData = getDayData(currentDay);
+  const absence = dayData.absence || {};
+  // Members already in other jobs today
+  const assignedSet = new Set();
+  dayData.jobs.forEach((job, idx) => {
+    if (editingJob !== null && editingJob.jobIdx === idx) return;
+    (job.team || '').split(',').map(s => s.trim()).filter(Boolean).forEach(n => assignedSet.add(n));
+  });
+  state.members.forEach(name => {
+    const checked = selectedMembers.includes(name);
+    const absStatus = absence[name]; // 'leave', 'mc', or undefined
+    const isAssigned = assignedSet.has(name);
+    let chipClass = 'member-chip';
+    if (checked) chipClass += ' checked';
+    if (absStatus) chipClass += ' absent';
+    else if (isAssigned && !checked) chipClass += ' assigned';
+    const suffix = absStatus === 'leave' ? ' (AL)' : absStatus === 'mc' ? ' (MC)' : isAssigned ? ' *' : '';
+    const chip = document.createElement('label');
+    chip.className = chipClass;
+    chip.innerHTML = `<input type="checkbox" value="${name}" ${checked ? 'checked' : ''} ${absStatus ? 'disabled' : ''}>${name}${suffix}`;
+    if (!absStatus) {
+      chip.querySelector('input').addEventListener('change', e => {
+        chip.classList.toggle('checked', e.target.checked);
+        chip.classList.toggle('assigned', !e.target.checked && isAssigned);
+      });
+    }
+    grid.appendChild(chip);
+  });
+  renderMemberRemoveList();
+}
+
+function renderMemberRemoveList() {
+  const list = document.getElementById('memberRemoveList');
+  list.innerHTML = '';
+  state.members.forEach(name => {
+    const chip = document.createElement('div');
+    chip.className = 'member-remove-chip';
+    chip.innerHTML = `${name}<button onclick="removeMember('${name}')" title="Remove">✕</button>`;
+    list.appendChild(chip);
+  });
+}
+
+function toggleManageMembers() {
+  const panel = document.getElementById('manageMembersPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function addMember() {
+  const input = document.getElementById('newMemberName');
+  const name = input.value.trim();
+  if (!name || state.members.includes(name)) return;
+  state.members.push(name);
+  input.value = '';
+  const checked = getCheckedMembers();
+  renderMemberGrid(checked);
+  persistState();
+}
+
+function removeMember(name) {
+  state.members = state.members.filter(m => m !== name);
+  const checked = getCheckedMembers().filter(m => m !== name);
+  renderMemberGrid(checked);
+  persistState();
+}
+
+function getCheckedMembers() {
+  return [...document.querySelectorAll('#memberGrid input:checked')].map(i => i.value);
+}
+
+function renderSalesmanGrid(selected) {
+  const grid = document.getElementById('salesmanGrid');
+  grid.innerHTML = '';
+  // "None" chip
+  const noneChip = document.createElement('label');
+  noneChip.className = 'member-chip' + (!selected ? ' checked' : '');
+  noneChip.style.fontStyle = 'italic';
+  noneChip.innerHTML = `<input type="radio" name="salesman" value="">None`;
+  noneChip.querySelector('input').addEventListener('change', () => {
+    grid.querySelectorAll('.member-chip').forEach(c => c.classList.remove('checked'));
+    noneChip.classList.add('checked');
+  });
+  grid.appendChild(noneChip);
+
+  state.salesmen.forEach(name => {
+    const chip = document.createElement('label');
+    chip.className = 'member-chip' + (selected === name ? ' checked' : '');
+    chip.innerHTML = `<input type="radio" name="salesman" value="${name}" ${selected === name ? 'checked' : ''}>${name}`;
+    chip.querySelector('input').addEventListener('change', e => {
+      grid.querySelectorAll('.member-chip').forEach(c => c.classList.remove('checked'));
+      if (e.target.checked) chip.classList.add('checked');
+    });
+    grid.appendChild(chip);
+  });
+  renderSalesmanRemoveList();
+}
+
+function renderSalesmanRemoveList() {
+  const list = document.getElementById('salesmanRemoveList');
+  list.innerHTML = '';
+  state.salesmen.forEach(name => {
+    const chip = document.createElement('div');
+    chip.className = 'member-remove-chip';
+    chip.innerHTML = `${name}<button onclick="removeSalesman('${name}')" title="Remove">✕</button>`;
+    list.appendChild(chip);
+  });
+}
+
+function toggleManageSalesmen() {
+  const panel = document.getElementById('manageSalesmenPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function addSalesman() {
+  const input = document.getElementById('newSalesmanName');
+  const name = input.value.trim();
+  if (!name || state.salesmen.includes(name)) return;
+  state.salesmen.push(name);
+  input.value = '';
+  const current = getSelectedSalesman();
+  renderSalesmanGrid(current);
+  persistState();
+}
+
+function removeSalesman(name) {
+  state.salesmen = state.salesmen.filter(s => s !== name);
+  const current = getSelectedSalesman() === name ? '' : getSelectedSalesman();
+  renderSalesmanGrid(current);
+  persistState();
+}
+
+function getSelectedSalesman() {
+  const checked = document.querySelector('#salesmanGrid input[name="salesman"]:checked');
+  return checked ? checked.value : '';
+}
+
+function getLastTeam() {
+  const data = getDayData(currentDay);
+  if (data.jobs.length > 0) return data.jobs[data.jobs.length-1].team || '';
+  return '';
+}
+
+
+function closeModal() {
+  document.getElementById('modalBg').classList.remove('open');
+  editingJob = null;
+}
+
+function saveJob() {
+  const job = {
+    team: getCheckedMembers().join(','),
+    customer: document.getElementById('fCustomer').value.trim(),
+    contact: document.getElementById('fContact').value.trim(),
+    address: document.getElementById('fAddress').value.trim(),
+    salesman: getSelectedSalesman(),
+    internalBilling: document.getElementById('fInternalBilling').checked,
+    ibAmount: document.getElementById('fInternalBilling').checked ? (parseFloat(document.getElementById('fIBAmount').value) || 0) : 0,
+    desc: document.getElementById('fDesc').value.trim()
+  };
+  const data = getDayData(currentDay);
+  if (editingJob !== null) {
+    data.jobs[editingJob.jobIdx] = job;
+  } else {
+    data.jobs.push(job);
+  }
+  closeModal();
+  persistState();
+  renderDay();
+  render();
+}
+
+function editJob(idx) { openModal(idx); }
+
+function deleteJob(idx) {
+  if (!confirm('Delete this job?')) return;
+  const data = getDayData(currentDay);
+  data.jobs.splice(idx, 1);
+  persistState();
+  renderDay();
+  render();
+}
+
+function moveJob(idx, dir) {
+  const data = getDayData(currentDay);
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= data.jobs.length) return;
+  [data.jobs[idx], data.jobs[newIdx]] = [data.jobs[newIdx], data.jobs[idx]];
+  persistState();
+  renderDay();
+}
+
+// ---- Comments ----
+let commentContext = null; // {dayKey, jobIdx}
+
+function fmtCommentTime(ts) {
+  const d = new Date(ts);
+  const timeStr = d.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit'});
+  const today = isoDate(new Date());
+  return isoDate(d) === today ? `Today ${timeStr}` : `${d.getDate()}/${d.getMonth()+1} ${timeStr}`;
+}
+
+function openComments(dayKey, jobIdx) {
+  const data = getDayData(dayKey);
+  const job = data.jobs[jobIdx];
+  if (!job) return;
+  commentContext = { dayKey, jobIdx };
+  document.getElementById('commentTitle').textContent = `💬 ${job.customer || 'Job '+(jobIdx+1)}`;
+  renderCommentList(job.comments || []);
+  document.getElementById('commentInput').value = '';
+  document.getElementById('commentBg').classList.add('open');
+  setTimeout(() => document.getElementById('commentInput').focus(), 100);
+}
+
+function renderCommentList(comments) {
+  const list = document.getElementById('commentList');
+  if (!comments.length) {
+    list.innerHTML = '<div class="comment-empty">No comments yet. Be the first to add one.</div>';
+    return;
+  }
+  const editBtns = VIEW_ONLY ? '' : `<div class="comment-actions">
+      <button onclick="editComment(IDX)" title="Edit">✏</button>
+      <button onclick="deleteComment(IDX)" title="Delete">✕</button>
+    </div>`;
+  list.innerHTML = comments.map((c, i) => `
+    <div class="comment-item">
+      ${editBtns.replace(/IDX/g, i)}
+      <div class="comment-text">${c.text.replace(/</g,'&lt;')}</div>
+      <div class="comment-time">${fmtCommentTime(c.ts)}${c.edited ? ' (edited)' : ''}</div>
+    </div>`).join('');
+  list.scrollTop = list.scrollHeight;
+}
+
+function deleteComment(idx) {
+  if (!commentContext) return;
+  const { dayKey, jobIdx } = commentContext;
+  const data = getDayData(dayKey);
+  const job = data.jobs[jobIdx];
+  if (!job) return;
+  job.comments.splice(idx, 1);
+  renderCommentList(job.comments);
+  persistState();
+}
+
+function editComment(idx) {
+  if (!commentContext) return;
+  const { dayKey, jobIdx } = commentContext;
+  const data = getDayData(dayKey);
+  const job = data.jobs[jobIdx];
+  if (!job || !job.comments[idx]) return;
+  const items = document.querySelectorAll('#commentList .comment-item');
+  const item = items[idx];
+  if (!item) return;
+  const original = job.comments[idx].text;
+  item.innerHTML = `
+    <textarea class="comment-edit-textarea">${original.replace(/</g,'&lt;')}</textarea>
+    <div class="comment-edit-row">
+      <button class="btn-confirm" onclick="saveEditComment(${idx})">Save</button>
+      <button class="btn-cancel" onclick="renderCommentList(getDayData(commentContext.dayKey).jobs[commentContext.jobIdx].comments||[])">Cancel</button>
+    </div>`;
+  const ta = item.querySelector('textarea');
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+
+function saveEditComment(idx) {
+  if (!commentContext) return;
+  const { dayKey, jobIdx } = commentContext;
+  const data = getDayData(dayKey);
+  const job = data.jobs[jobIdx];
+  if (!job || !job.comments[idx]) return;
+  const items = document.querySelectorAll('#commentList .comment-item');
+  const text = items[idx] && items[idx].querySelector('textarea')
+    ? items[idx].querySelector('textarea').value.trim() : '';
+  if (!text) return;
+  job.comments[idx].text = text;
+  job.comments[idx].edited = true;
+  renderCommentList(job.comments);
+  persistState();
+}
+
+function addComment() {
+  const text = document.getElementById('commentInput').value.trim();
+  if (!text || !commentContext) return;
+  const { dayKey, jobIdx } = commentContext;
+  const data = getDayData(dayKey);
+  const job = data.jobs[jobIdx];
+  if (!job) return;
+  if (!Array.isArray(job.comments)) job.comments = [];
+  job.comments.push({ text, ts: Date.now() });
+  document.getElementById('commentInput').value = '';
+  renderCommentList(job.comments);
+  // Save: view-only writes only this day's jobs; editors use full persistState
+  if (VIEW_ONLY) {
+    saveCommentToFirebase(dayKey, data.jobs);
+  } else {
+    persistState();
+  }
+}
+
+function saveCommentToFirebase(dayKey, jobs) {
+  if (!fbReady) return;
+  const updates = {};
+  updates['schedule/' + dayKey + '/jobs'] = jobs;
+  updates['lastModified'] = Date.now();
+  fbRef.update(updates).catch(e => console.error('Comment save failed', e));
+}
+
+// ---- WhatsApp formatting ----
+function buildWAText() {
+  const ws = state.weekStart;
+  const rev = state.revNums[weekKey(ws)] || 0;
+  let lines = rev > 0 ? [`Schedule revise ${rev}`] : [];
+
+  DAYS.forEach((day, i) => {
+    const d = getDayDate(ws, i);
+    const key = isoDate(d);
+    const data = getDayData(key);
+    const hasContent = data.holiday || data.jobs.length > 0;
+    if (!hasContent) return;
+
+    lines.push('');
+    lines.push(`${fmtDate(d)} ${day}`);
+
+    if (data.holiday) {
+      lines.push(`*PUBLIC HOLIDAY${data.holidayLabel ? ' ('+data.holidayLabel+')' : ''}*`);
+      return;
+    }
+
+    const absence = data.absence || {};
+    const onLeave = Object.keys(absence).filter(n => absence[n] === 'leave');
+    const onMC = Object.keys(absence).filter(n => absence[n] === 'mc');
+    if (onLeave.length) lines.push(`*(${onLeave.join(', ')} on leave)*`);
+    if (onMC.length) lines.push(`*(${onMC.join(', ')} on MC)*`);
+
+    // Group consecutive jobs by team
+    const groups = [];
+    data.jobs.forEach(job => {
+      const last = groups[groups.length-1];
+      if (last && last.team === job.team) {
+        last.jobs.push(job);
+      } else {
+        groups.push({ team: job.team, jobs: [job] });
+      }
+    });
+    if (groups.length === 0) return;
+
+    let jobNum = 1;
+    groups.forEach(grp => {
+      lines.push(`*${grp.team}*`);
+      grp.jobs.forEach(job => {
+        let line = `${jobNum}-${job.customer}`;
+        if (job.contact) line += ` ${job.contact}`;
+        if (job.address) line += ` ${job.address}`;
+        if (job.salesman) line += ` (${job.salesman})`;
+        lines.push(line);
+        if (job.desc) lines.push(job.desc);
+        (job.comments || []).forEach(c => lines.push(`> ${c.text}`));
+        jobNum++;
+      });
+    });
+  });
+
+  return lines.join('\n');
+}
+
+function showWAPreview() {
+  try {
+    const text = buildWAText();
+    document.getElementById('waText').textContent = text;
+    document.getElementById('waBg').classList.add('open');
+  } catch(e) { alert('WhatsApp error: ' + e.message); }
+}
+
+function copyWA() {
+  const text = buildWAText();
+  navigator.clipboard.writeText(text).then(() => {
+    const ok = document.getElementById('copyOk');
+    ok.classList.add('show');
+    setTimeout(() => ok.classList.remove('show'), 2000);
+  });
+}
+
+// ---- Monthly Summary ----
+function openSummary() {
+  const sel = document.getElementById('summaryMonth');
+  sel.innerHTML = '';
+  // Collect all months that have internal billing jobs
+  const months = new Set();
+  Object.keys(state.schedule).forEach(dateKey => {
+    const day = getDayData(dateKey);
+    if ((day.jobs || []).some(j => j.internalBilling)) {
+      months.add(dateKey.slice(0, 7)); // YYYY-MM
+    }
+  });
+  if (months.size === 0) {
+    // Still open but show no months
+    sel.innerHTML = '<option value="">No internal billing jobs yet</option>';
+  } else {
+    [...months].sort().reverse().forEach(m => {
+      const [y, mo] = m.split('-');
+      const label = new Date(y, mo-1, 1).toLocaleString('en-GB', {month:'long', year:'numeric'});
+      sel.innerHTML += `<option value="${m}">${label}</option>`;
+    });
+  }
+  document.getElementById('summaryBg').classList.add('open');
+  renderSummary();
+}
+
+function renderSummary() {
+  const month = document.getElementById('summaryMonth').value;
+  const content = document.getElementById('summaryContent');
+  if (!month) { content.innerHTML = '<div class="summary-empty">No data.</div>'; return; }
+
+  // Collect all IB jobs for this month
+  const bySalesman = {};
+  Object.keys(state.schedule).forEach(dateKey => {
+    if (!dateKey.startsWith(month)) return;
+    const day = getDayData(dateKey);
+    (day.jobs || []).filter(j => j.internalBilling).forEach(job => {
+      const key = job.salesman || '(No salesman)';
+      if (!bySalesman[key]) bySalesman[key] = [];
+      bySalesman[key].push({ date: dateKey, customer: job.customer, desc: job.desc, amount: job.ibAmount || 0 });
+    });
+  });
+
+  const salesmen = Object.keys(bySalesman).sort();
+  if (salesmen.length === 0) {
+    content.innerHTML = '<div class="summary-empty">No internal billing jobs for this month.</div>';
+    return;
+  }
+
+  let grandTotal = 0;
+  let rows = salesmen.map(sm => {
+    const jobs = bySalesman[sm];
+    const total = jobs.reduce((s, j) => s + j.amount, 0);
+    grandTotal += total;
+    const jobList = jobs.map(j => {
+      const d = new Date(j.date);
+      return `<div class="job-item">${j.customer || '—'}${j.desc ? ' — '+j.desc : ''}<span class="job-date">(${d.getDate()}/${d.getMonth()+1})</span></div>`;
+    }).join('');
+    return `<tr>
+      <td class="salesman-name">${sm}<div style="font-weight:400;margin-top:4px">${jobList}</div></td>
+      <td>${jobList}</td>
+      <td style="text-align:right;white-space:nowrap;color:#f39c12;font-weight:600">${total > 0 ? 'RM '+total.toLocaleString('en',{minimumFractionDigits:2}) : '—'}</td>
+      <td style="text-align:center;color:#aaa">${jobs.length}</td>
+    </tr>`;
+  }).join('');
+
+  const totalCount = salesmen.reduce((s,sm)=>s+bySalesman[sm].length,0);
+  content.innerHTML = `
+    <table class="summary-table">
+      <thead><tr><th>Salesman</th><th>Jobs</th><th style="text-align:right">Amount</th><th style="text-align:center">Count</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 16px;background:#0f3460;border-radius:8px;border:2px solid #f39c12">
+      <span style="font-weight:700;color:#f39c12;font-size:14px">GRAND TOTAL (${totalCount} jobs)</span>
+      <span style="font-weight:700;color:#f39c12;font-size:16px">RM ${grandTotal.toLocaleString('en',{minimumFractionDigits:2})}</span>
+    </div>`;
+}
+
+// ---- Firebase ----
+const FB_CONFIG = {
+  apiKey: "AIzaSyD8Cohe6nZ0A9kH0kUzQjpRvBQ_VDQZN7k",
+  authDomain: "service-schedule-2c481.firebaseapp.com",
+  databaseURL: "https://service-schedule-2c481-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "service-schedule-2c481",
+  storageBucket: "service-schedule-2c481.firebasestorage.app",
+  messagingSenderId: "525138167935",
+  appId: "1:525138167935:web:25e98bc7e98ca64704974a"
+};
+let fbReady = false;
+let fbRef = null;
+
+function initFirebase() {
+  try {
+    firebase.initializeApp(FB_CONFIG);
+    fbRef = firebase.database().ref('schedule');
+    fbReady = true;
+  } catch(e) { console.warn('Firebase init failed', e); }
+}
+
+function setSyncStatus(status) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  if (!dot) return;
+  dot.className = 'sync-dot ' + status;
+  lbl.textContent = status === 'synced' ? 'Synced ✓' : status === 'syncing' ? 'Syncing…' : 'Offline';
+}
+
+// ---- Persistence ----
+function persistState() {
+  if (VIEW_ONLY) return; // view-only users never write
+  state.lastModified = Date.now();
+  const toSave = { ...state, weekStart: state.weekStart.toISOString() };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+  if (fbReady) {
+    setSyncStatus('syncing');
+    fbRef.set(toSave)
+      .then(() => setSyncStatus('synced'))
+      .catch(() => setSyncStatus('offline'));
+  }
+}
+
+// ---- PDF Export ----
+function exportWeekPDF() {
+  if (!window.jspdf) { alert('PDF library not loaded. Check your internet connection.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const ws = state.weekStart;
+  const endDate = getDayDate(ws, 5);
+  const rev = state.revNums[weekKey(ws)] || 0;
+  const pageW = 210;
+  const margin = 12;
+  const contentW = pageW - margin * 2; // 186mm
+
+  // Header bar
+  doc.setFillColor(22, 33, 62);
+  doc.rect(0, 0, pageW, 26, 'F');
+  doc.setTextColor(233, 69, 96);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Ipoh Hydrotech Engineering Sdn Bhd', margin, 10);
+  doc.setTextColor(200, 200, 200);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Service Schedule  |  ' + fmtDate(ws) + ' – ' + fmtDate(endDate) + (rev ? '  |  Rev ' + rev : ''), margin, 17);
+  doc.setFontSize(7.5);
+  doc.setTextColor(130, 130, 130);
+  doc.text('Generated: ' + new Date().toLocaleString('en-GB'), pageW - margin, 17, { align: 'right' });
+
+  let y = 30;
+
+  DAYS.forEach((dayName, i) => {
+    const d = getDayDate(ws, i);
+    const key = isoDate(d);
+    const data = getDayData(key);
+    const jobs = data.jobs || [];
+    if (!data.holiday && jobs.length === 0) return;
+
+    // Page break check
+    if (y > 262) { doc.addPage(); y = 14; }
+
+    // Day bar
+    doc.setFillColor(15, 52, 96);
+    doc.roundedRect(margin, y, contentW, 8, 1, 1, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(dayName.toUpperCase() + '   ' + fmtDate(d), margin + 3, y + 5.5);
+    y += 10;
+
+    if (data.holiday) {
+      doc.setTextColor(233, 69, 96);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('PUBLIC HOLIDAY' + (data.holidayLabel ? ' — ' + data.holidayLabel : ''), margin + 3, y + 4);
+      y += 10;
+      return;
+    }
+
+    // Absence line
+    const absence = data.absence || {};
+    const onLeave = Object.keys(absence).filter(n => absence[n] === 'leave');
+    const onMC = Object.keys(absence).filter(n => absence[n] === 'mc');
+    if (onLeave.length || onMC.length) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      const parts = [];
+      if (onLeave.length) parts.push(onLeave.join(', ') + ' on Annual Leave');
+      if (onMC.length) parts.push(onMC.join(', ') + ' on MC');
+      doc.setTextColor(210, 130, 50);
+      doc.text(parts.join('   |   '), margin + 3, y);
+      y += 5;
+    }
+
+    // Build table rows
+    const body = jobs.map((job, idx) => {
+      const customerLines = [job.customer, job.address].filter(Boolean).join('\n');
+      const descLines = [job.desc, ...(job.comments || []).map(c => '> ' + c.text)].filter(Boolean).join('\n');
+      const ibSuffix = job.internalBilling ? (job.ibAmount ? '\n[INT BILL RM ' + Number(job.ibAmount).toFixed(2) + ']' : '\n[INT BILL]') : '';
+      return [
+        { content: String(idx + 1), styles: { halign: 'center', fontStyle: 'bold' } },
+        job.team || '',
+        { content: customerLines + ibSuffix, styles: job.internalBilling ? { textColor: [200, 130, 20] } : {} },
+        job.contact || '',
+        job.salesman || '',
+        descLines
+      ];
+    });
+
+    doc.autoTable({
+      startY: y,
+      head: [['#', 'Team', 'Customer / Location', 'Contact', 'Salesman', 'Description / Comments']],
+      body,
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 8, cellPadding: { top: 2, right: 2, bottom: 2, left: 2 }, valign: 'top', overflow: 'linebreak' },
+      headStyles: { fillColor: [26, 26, 46], textColor: [180, 180, 180], fontStyle: 'bold', fontSize: 7.5 },
+      alternateRowStyles: { fillColor: [240, 242, 248] },
+      columnStyles: {
+        0: { cellWidth: 8 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 45 },
+        3: { cellWidth: 24 },
+        4: { cellWidth: 16 },
+        5: { cellWidth: 65 }
+      }
+    });
+
+    y = doc.lastAutoTable.finalY + 6;
+  });
+
+  // Page numbers
+  const total = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7.5);
+    doc.setTextColor(160, 160, 160);
+    doc.text('Page ' + p + ' of ' + total, pageW / 2, 292, { align: 'center' });
+  }
+
+  doc.save('Schedule ' + isoDate(ws) + '.pdf');
+}
+
+// ---- Backup / Restore ----
+function exportBackup() {
+  const data = { ...state, weekStart: state.weekStart.toISOString() };
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `iht-schedule-${isoDate(new Date())}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup() {
+  if (!confirm('Restore from backup? This will overwrite all current data.')) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        applyStateData(data);
+        persistState();
+        render();
+        alert('Backup restored successfully.');
+      } catch(err) {
+        alert('Restore failed: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function deleteWeek() {
+  if (!confirm('Delete all jobs for this week?')) return;
+  // Delete Mon–Sat keys
+  DAYS.forEach((_, i) => {
+    const key = isoDate(getDayDate(state.weekStart, i));
+    delete state.schedule[key];
+  });
+  // Also remove the Sunday before this Monday (leftover from old timezone bug)
+  const sunday = new Date(state.weekStart);
+  sunday.setDate(sunday.getDate() - 1);
+  delete state.schedule[isoDate(sunday)];
+  // Remove old-format saved key if present
+  localStorage.removeItem('hydrotech_saved_' + weekKey(state.weekStart));
+  persistState();
+  renderDay();
+  render();
+}
+
+function toggleHistory() {
+  const panel = document.getElementById('historyPanel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) renderHistory();
+}
+
+function getWeeksWithData() {
+  // Group all schedule keys by their Monday (week start)
+  const weekMap = {};
+  Object.keys(state.schedule).forEach(dateKey => {
+    const d = new Date(dateKey);
+    const mon = getMonday(d);
+    const monKey = isoDate(mon);
+    if (!weekMap[monKey]) weekMap[monKey] = { weekStart: mon, jobs: 0, days: 0 };
+    const day = getDayData(dateKey);
+    const jobCount = (day.jobs || []).length;
+    if (jobCount > 0 || day.holiday) {
+      weekMap[monKey].jobs += jobCount;
+      weekMap[monKey].days++;
+    }
+  });
+  return Object.values(weekMap)
+    .filter(w => w.jobs > 0 || w.days > 0)
+    .sort((a, b) => b.weekStart - a.weekStart);
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  list.innerHTML = '';
+  const weeks = getWeeksWithData();
+  const currentWeekKey = weekKey(state.weekStart);
+  if (weeks.length === 0) {
+    list.innerHTML = '<div style="color:#555;font-size:12px">No schedules yet.</div>';
+    return;
+  }
+  weeks.forEach(w => {
+    const ws = w.weekStart;
+    const we = new Date(ws); we.setDate(we.getDate() + 5);
+    const isCurrent = isoDate(ws) === currentWeekKey;
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.style.borderColor = isCurrent ? '#e94560' : '';
+    div.innerHTML = `
+      <div class="hi-week">${fmtDate(ws)} – ${fmtDate(we)}${isCurrent ? ' <span style="color:#e94560">(current)</span>' : ''}</div>
+      <div class="hi-jobs">${w.jobs} job(s) across ${w.days} day(s)</div>`;
+    div.onclick = () => loadWeek(isoDate(ws));
+    list.appendChild(div);
+  });
+}
+
+function loadWeek(monKey) {
+  state.weekStart = new Date(monKey);
+  currentDay = isoDate(getDayDate(state.weekStart, 0));
+  toggleHistory();
+  render();
+}
+
+// Keyboard shortcut: Esc to close modals
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    document.getElementById('waBg').classList.remove('open');
+    document.getElementById('commentBg').classList.remove('open');
+  }
+});
+
+init();
+</script>
+</body>
+</html>
