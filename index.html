@@ -343,14 +343,14 @@
     .holiday-label-input { width: 160px; font-size: 14px !important; }
 
     /* Job cards — bigger touch targets */
-    .job-card { padding: 12px 12px 12px 12px; }
+    .job-card { padding: 12px 12px 10px 12px; }
     .job-card .job-num { width: 24px; height: 24px; font-size: 11px; top: 12px; left: 10px; }
-    .job-card .job-body { margin-left: 32px; margin-right: 80px; }
+    .job-card .job-body { margin-left: 32px; margin-right: 0; }
     .job-card .job-team { font-size: 13px; }
     .job-card .job-customer { font-size: 13px; line-height: 1.4; }
     .job-card .job-desc { font-size: 12px; }
-    .job-card .job-actions { gap: 6px; top: 8px; right: 8px; }
-    .job-actions button { width: 34px; height: 34px; font-size: 14px; border-radius: 6px; }
+    .job-card .job-actions { position: static; display: flex; justify-content: flex-end; margin-top: 10px; margin-left: 32px; gap: 6px; flex-wrap: wrap; }
+    .job-actions button { width: 36px; height: 36px; font-size: 15px; border-radius: 6px; }
 
     /* Modal: bottom sheet */
     .modal-bg { -webkit-align-items: flex-end; align-items: flex-end; }
