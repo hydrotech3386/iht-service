@@ -1689,12 +1689,13 @@ function renderDay() {
     const status = job.status || 'pending';
     const statusLabel = STATUS_LABELS[status] || status;
     const canClickStatus = currentRole === 'admin' || currentRole === 'technician';
+    const showIB = job.internalBilling && (currentRole !== 'salesman' || isOwnIBJob(job));
     const card = document.createElement('div');
-    card.className = 'job-card' + (job.internalBilling ? ' internal-billing' : '');
+    card.className = 'job-card' + (showIB ? ' internal-billing' : '');
     card.innerHTML = `
       <div class="job-num">${idx+1}</div>
       <div class="job-body">
-        <div class="job-team">${job.team || ''}${job.internalBilling ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}</div>
+        <div class="job-team">${job.team || ''}${showIB ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}</div>
         <div class="job-customer">${job.customer || ''}${job.contact ? ' <span class="contact">'+job.contact+'</span>' : ''}${job.address ? ' '+job.address : ''}${job.salesman ? ' ('+job.salesman+')' : ''}</div>
         ${job.desc ? `<div class="job-desc">${job.desc}</div>` : ''}
         <span class="status-badge ${status}${canClickStatus?' clickable':''}" ${canClickStatus?`onclick="updateJobStatus(${idx})"`:''}>${statusLabel}</span>
