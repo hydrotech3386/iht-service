@@ -1377,12 +1377,14 @@ function renderUsersList() {
       const roleOpts = ['pending','technician','salesman','admin'].map(r =>
         `<option value="${r}" ${u.role===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`
       ).join('');
+      const isSelf = currentUser && uid === currentUser.uid;
       row.innerHTML = `
         <div style="flex:1;min-width:0">
-          <div class="user-row-name">${u.name || 'Unknown'}</div>
+          <div class="user-row-name">${u.name || 'Unknown'}${isSelf ? ' <span style="font-size:10px;color:#aaa">(you)</span>' : ''}</div>
           <div class="user-row-email">${u.email || uid}</div>
         </div>
-        <select class="user-row-role" onchange="setUserRole('${uid}',this.value)">${roleOpts}</select>`;
+        <select class="user-row-role" onchange="setUserRole('${uid}',this.value)">${roleOpts}</select>
+        ${isSelf ? '' : `<button onclick="deleteUser('${uid}','${(u.name||'this user').replace(/'/g,"\\'")}','${u.role||''}')" title="Remove user" style="background:#e94560;border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`}`;
       list.appendChild(row);
     });
   }).catch(() => {
@@ -1393,6 +1395,17 @@ function renderUsersList() {
 function setUserRole(uid, role) {
   firebase.database().ref('users/' + uid + '/role').set(role)
     .catch(e => alert('Failed to update role: ' + e.message));
+}
+
+function deleteUser(uid, name, role) {
+  if (role === 'admin') {
+    if (!confirm(`Remove admin "${name}"? They will lose access immediately.`)) return;
+  } else {
+    if (!confirm(`Remove "${name}"? They will no longer be able to log in.`)) return;
+  }
+  firebase.database().ref('users/' + uid).remove()
+    .then(() => renderUsersList())
+    .catch(e => alert('Failed to remove user: ' + e.message));
 }
 
 // ---- Job Status ----
