@@ -1802,7 +1802,6 @@ function renderDay() {
         <div class="job-team">${job.team || ''}${showIB ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}</div>
         <div class="job-customer">${job.customer || ''}${job.contact ? ' <span class="contact">'+job.contact+'</span>' : ''}${job.address ? ' '+job.address : ''}${job.salesman ? ' ('+job.salesman+')' : ''}</div>
         ${job.desc ? `<div class="job-desc">${job.desc}</div>` : ''}
-        ${job.location ? `<div style="margin-top:3px;display:flex;align-items:center;gap:6px"><a href="https://maps.google.com/?q=${job.location.lat},${job.location.lng}" target="_blank" rel="noopener" style="color:#6c5ce7;font-size:11px;text-decoration:none">📍 ${job.location.by || ''} · ${new Date(job.location.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</a>${currentRole !== 'view-only' ? '<button onclick="clearJobLocation(\'' + currentDay + '\',' + idx + ')" style="background:none;border:none;color:#555;cursor:pointer;font-size:11px;padding:0;line-height:1" title="Remove location">✕</button>' : ''}</div>` : ''}
         <span class="status-badge ${status}${canClickStatus?' clickable':''}" ${canClickStatus?`onclick="updateJobStatus(${idx})"`:''}>${statusLabel}</span>
       </div>
       <div class="job-actions">
@@ -1816,6 +1815,27 @@ function renderDay() {
         <button class="btn-edit-job" onclick="moveJob(${idx},1)" title="Move Down">▼</button>
         <button class="btn-edit-job" onclick="deleteJob(${idx})" title="Delete">✕</button>
       </div>`;
+    if (job.location) {
+      const locDiv = document.createElement('div');
+      locDiv.style.cssText = 'margin-top:3px;display:flex;align-items:center;gap:6px';
+      const link = document.createElement('a');
+      link.href = `https://maps.google.com/?q=${job.location.lat},${job.location.lng}`;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.style.cssText = 'color:#6c5ce7;font-size:11px;text-decoration:none';
+      link.textContent = `📍 ${job.location.by || ''} · ${new Date(job.location.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
+      locDiv.appendChild(link);
+      if (currentRole !== 'view-only') {
+        const clrBtn = document.createElement('button');
+        clrBtn.style.cssText = 'background:none;border:none;color:#aaa;cursor:pointer;font-size:12px;padding:0 2px;line-height:1';
+        clrBtn.title = 'Remove location';
+        clrBtn.textContent = '✕';
+        clrBtn.onclick = () => clearJobLocation(currentDay, idx);
+        locDiv.appendChild(clrBtn);
+      }
+      const statusBadge = card.querySelector('.status-badge');
+      statusBadge.parentNode.insertBefore(locDiv, statusBadge);
+    }
     list.appendChild(card);
   });
 }
