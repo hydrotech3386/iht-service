@@ -2798,6 +2798,10 @@ function removeReqFile(idx) {
 // ---- Location sharing ----
 function shareJobLocation(dayKey, jobIdx) {
   if (!navigator.geolocation) { alert('Geolocation is not supported on this device.'); return; }
+  const d = getDayData(dayKey);
+  const job = d.jobs[jobIdx];
+  if (!job) return;
+  if (!confirm(`Share your current location to "${job.customer || 'this job'}"?`)) return;
   navigator.geolocation.getCurrentPosition(pos => {
     const { latitude: lat, longitude: lng } = pos.coords;
     const d = getDayData(dayKey);
