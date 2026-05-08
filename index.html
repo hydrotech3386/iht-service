@@ -718,7 +718,7 @@ const STATUS_LABELS = {'pending':'Pending','in-progress':'In Progress','complete
 const TG_TOKEN = '8371008663:AAFZVlpuQ9PAsYu1nTOUDBVr9lvAWLrnHQw';
 
 let notifEnabled = false;
-let prevNewReqCount = 0;
+let seenReqKeys = new Set();
 let isFirstReqSnap = true;
 let prevCommentCounts = {};
 let isFirstSchedSnap = true;
@@ -807,13 +807,18 @@ function checkNewComments(oldCounts) {
         const c = job.comments[newCount - 1];
         // Don't notify about your own comment
         if (c && c.authorUid !== (currentUser && currentUser.uid)) {
-          const preview = (c.text || '').slice(0, 100);
+          const preview = (c.text || '').slice(0, 200);
           const author = c.authorName || 'Someone';
-          const tgMsg = `💬 <b>New Comment</b>\n<b>${job.customer || 'Job'}</b>\n${author}: ${preview}`;
+          const jobInfo = [
+            job.address ? `📍 ${job.address}` : null,
+            `📅 ${dayKey}`
+          ].filter(Boolean).join('\n');
+          const adminMsg = `💬 <b>New Comment</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${author}: ${preview}`;
+          const salesmanMsg = `💬 <b>New Comment on Your Job</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${author}: ${preview}`;
           showNotif('💬 New Comment', `${job.customer || 'Job'}: ${preview}`);
-          sendTelegramToAdmins(tgMsg);
+          sendTelegramToAdmins(adminMsg);
           if (job.salesmanUid && job.salesmanUid !== c.authorUid) {
-            sendTelegramToUser(job.salesmanUid, `💬 <b>New Comment on Your Job</b>\n<b>${job.customer || 'Job'}</b>\n${author}: ${preview}`);
+            sendTelegramToUser(job.salesmanUid, salesmanMsg);
           }
         }
       }
@@ -933,18 +938,34 @@ function setupFirebaseListener() {
     fbReqRef = firebase.database().ref('requests');
     fbReqRef.on('value', snap => {
       let count = 0;
-      snap.forEach(child => { if (child.val().status === 'new') count++; });
+      const incoming = [];
+      snap.forEach(child => {
+        const r = child.val();
+        if (r.status === 'new') {
+          count++;
+          if (!isFirstReqSnap && !seenReqKeys.has(child.key)) incoming.push(r);
+          seenReqKeys.add(child.key);
+        }
+      });
       const badge = document.getElementById('reqCount');
       badge.textContent = count;
       badge.style.display = count > 0 ? 'flex' : 'none';
-      if (isFirstReqSnap) { isFirstReqSnap = false; prevNewReqCount = count; }
-      else if (count > prevNewReqCount) {
-        const n = count - prevNewReqCount;
-        const msg = `📋 <b>New Service Request</b>\n${n} new request${n > 1 ? 's' : ''} pending assignment`;
-        showNotif('📋 New Service Request', `${n} new request${n > 1 ? 's' : ''} pending assignment`);
-        sendTelegramToAdmins(msg);
-        prevNewReqCount = count;
-      } else { prevNewReqCount = count; }
+      if (isFirstReqSnap) { isFirstReqSnap = false; }
+      else {
+        incoming.forEach(r => {
+          const lines = [
+            `📋 <b>New Service Request</b>`,
+            `👤 <b>${r.customer}</b>`,
+            r.contact   ? `📞 ${r.contact}` : null,
+            r.address   ? `📍 ${r.address}` : null,
+            r.preferredDate ? `📅 Preferred: ${r.preferredDate}` : null,
+            r.desc      ? `📝 ${r.desc}` : null,
+            `🙋 By: ${r.salesmanName || r.salesmanEmail || 'Unknown'}`
+          ].filter(Boolean).join('\n');
+          showNotif('📋 New Service Request', `${r.customer} — by ${r.salesmanName || '?'}`);
+          sendTelegramToAdmins(lines);
+        });
+      }
     });
   }
   if (VIEW_ONLY || currentRole === 'view-only') {
@@ -1137,9 +1158,16 @@ function confirmAssign() {
   });
   // Notify salesman their request was assigned
   if (assigningReq.submittedByUid) {
-    const teamStr = team.length ? `\nTeam: ${team.join(', ')}` : '';
-    sendTelegramToUser(assigningReq.submittedByUid,
-      `✅ <b>Job Assigned</b>\n<b>${assigningReq.customer}</b>\nScheduled: ${date}${teamStr}`);
+    const assignLines = [
+      `✅ <b>Job Request Assigned</b>`,
+      `👤 <b>${assigningReq.customer}</b>`,
+      assigningReq.contact ? `📞 ${assigningReq.contact}` : null,
+      assigningReq.address ? `📍 ${assigningReq.address}` : null,
+      `📅 Scheduled: ${date}`,
+      team.length ? `👷 Team: ${team.join(', ')}` : null,
+      assigningReq.desc ? `📝 ${assigningReq.desc}` : null
+    ].filter(Boolean).join('\n');
+    sendTelegramToUser(assigningReq.submittedByUid, assignLines);
   }
   // Mark request scheduled
   firebase.database().ref('requests/' + assigningReqKey).update({
@@ -1224,9 +1252,15 @@ function updateJobStatus(idx) {
   const cur = job.status || 'pending';
   const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
   job.status = next;
-  const statusMsg = `🔄 <b>Job Status Updated</b>\n<b>${job.customer || 'Job'}</b>\nStatus: <b>${STATUS_LABELS[next]}</b>`;
-  if (job.salesmanUid) sendTelegramToUser(job.salesmanUid, statusMsg);
-  if (currentRole === 'technician') sendTelegramToAdmins(statusMsg);
+  const statusLines = [
+    `🔄 <b>Job Status: ${STATUS_LABELS[next]}</b>`,
+    `👤 <b>${job.customer || 'Job'}</b>`,
+    job.address ? `📍 ${job.address}` : null,
+    `📅 Date: ${currentDay}`,
+    job.team ? `👷 Team: ${job.team}` : null
+  ].filter(Boolean).join('\n');
+  if (job.salesmanUid) sendTelegramToUser(job.salesmanUid, statusLines);
+  if (currentRole === 'technician') sendTelegramToAdmins(statusLines);
   persistState();
   renderDay();
 }
