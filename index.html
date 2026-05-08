@@ -674,8 +674,8 @@
     <h2>🔔 Telegram Notifications</h2>
     <ol style="font-size:13px;color:#ccc;margin:0 0 14px;padding-left:20px;line-height:2.1">
       <li>Open Telegram → search <b>@IHTServiceBot</b> → tap <b>Start</b></li>
-      <li>Send any message to the bot</li>
-      <li>Tap <b>Find My Chat ID</b> below</li>
+      <li>Send any message to the bot (e.g. "hi")</li>
+      <li>Come back here immediately → tap <b>Find My Chat ID</b></li>
       <li>Click <b>Save</b></li>
     </ol>
     <button id="tgFindBtn" onclick="findMyChatId()" style="width:100%;padding:9px;background:#0088cc;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:12px">🔍 Find My Chat ID</button>
@@ -779,19 +779,23 @@ function findMyChatId() {
   const msg = document.getElementById('tgFindMsg');
   btn.textContent = 'Searching...';
   btn.disabled = true;
-  fetch(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates`)
+  const now = Math.floor(Date.now() / 1000);
+  fetch(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates?limit=100`)
     .then(r => r.json())
     .then(data => {
       if (data.ok && data.result.length > 0) {
-        const latest = data.result[data.result.length - 1];
-        const chatId = (latest.message || latest.callback_query?.message)?.chat?.id;
-        if (chatId) {
+        // Only consider messages sent within the last 2 minutes
+        const recent = data.result
+          .filter(u => u.message && (now - u.message.date) <= 120)
+          .sort((a, b) => b.message.date - a.message.date);
+        if (recent.length > 0) {
+          const chatId = recent[0].message.chat.id;
           document.getElementById('tgChatIdInput').value = chatId;
           msg.style.color = '#4caf50';
           msg.textContent = `✓ Found your Chat ID: ${chatId}`;
         } else {
-          msg.style.color = '#e94560';
-          msg.textContent = 'Could not detect Chat ID. Try sending another message to the bot.';
+          msg.style.color = '#f39c12';
+          msg.textContent = 'No recent message found — send a message to @IHTServiceBot then tap again immediately.';
         }
       } else {
         msg.style.color = '#e94560';
