@@ -1138,6 +1138,10 @@ function submitServiceRequest() {
     // Update existing request
     firebase.database().ref('requests/' + editingReqKey).update(fields)
       .then(() => {
+        if (currentRole === 'salesman') {
+          const name = document.getElementById('userName').textContent || 'Salesman';
+          sendTelegramToAdmins(`✏️ <b>Request Updated by Salesman</b>\n👤 <b>${fields.customer}</b>\n${fields.contact ? `📞 ${fields.contact}\n` : ''}${fields.address ? `📍 ${fields.address}\n` : ''}🙋 By: ${name}`);
+        }
         editingReqKey = null;
         document.getElementById('svcReqBg').classList.remove('open');
         document.getElementById('requestsBg').classList.add('open');
@@ -1204,8 +1208,10 @@ function loadRequests() {
       const schedHtml = r.scheduledTo ? `<span class="req-sched-badge">✓ ${r.scheduledTo}${r.scheduledTeam ? ' · '+r.scheduledTeam : ''}</span>` : '';
       const isOwn = currentUser && r.submittedByUid === currentUser.uid;
       const canEdit = isOwn && r.status === 'new';
-      const adminActions = !isSalesman && r.status === 'new'
-        ? `<button class="btn-assign" onclick="openAssign('${r._key}')">📅 Assign</button>` : '';
+      const canAdminEdit = currentRole === 'admin' && r.status === 'new';
+      const adminActions = canAdminEdit
+        ? `<button class="btn-assign" onclick="openAssign('${r._key}')">📅 Assign</button>
+           <button class="btn-assign" onclick="editRequest('${r._key}')" style="background:#2980b9">✏️ Edit</button>` : '';
       const editBtn = canEdit
         ? `<button class="btn-assign" onclick="editRequest('${r._key}')" style="background:#2980b9">✏️ Edit</button>` : '';
       const delBtn = (currentRole === 'admin' || canEdit)
@@ -1309,9 +1315,16 @@ function confirmAssign() {
 
 function deleteRequest(key) {
   if (!confirm('Remove this request?')) return;
-  firebase.database().ref('requests/' + key).remove()
-    .then(() => loadRequests())
-    .catch(e => alert('Failed: ' + e.message));
+  firebase.database().ref('requests/' + key).once('value').then(snap => {
+    const r = snap.val();
+    return firebase.database().ref('requests/' + key).remove().then(() => {
+      if (currentRole === 'salesman' && r) {
+        const name = document.getElementById('userName').textContent || 'Salesman';
+        sendTelegramToAdmins(`🗑️ <b>Request Deleted by Salesman</b>\n👤 <b>${r.customer}</b>\n🙋 By: ${name}`);
+      }
+      loadRequests();
+    });
+  }).catch(e => alert('Failed: ' + e.message));
 }
 
 function updateRequestsBadge() {
