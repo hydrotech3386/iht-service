@@ -688,6 +688,57 @@ let currentRole = 'view-only';
 const STATUS_CYCLE = ['pending','in-progress','completed','cancelled'];
 const STATUS_LABELS = {'pending':'Pending','in-progress':'In Progress','completed':'Completed','cancelled':'Cancelled'};
 
+// ---- Notifications ----
+let notifEnabled = false;
+let prevNewReqCount = 0;
+let isFirstReqSnap = true;
+let prevCommentCounts = {};
+let isFirstSchedSnap = true;
+
+function requestNotifPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') { notifEnabled = true; return; }
+  if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(p => { notifEnabled = p === 'granted'; });
+  }
+}
+
+function showNotif(title, body) {
+  if (!notifEnabled || Notification.permission !== 'granted') return;
+  try { new Notification(title, { body }); } catch(e) {}
+}
+
+function snapshotCommentCounts() {
+  const counts = {};
+  Object.keys(state.schedule || {}).forEach(dayKey => {
+    const entry = state.schedule[dayKey];
+    if (!entry) return;
+    const jobs = Array.isArray(entry.jobs) ? entry.jobs : Object.values(entry.jobs || {});
+    jobs.forEach((job, idx) => { counts[dayKey + '/' + idx] = (job.comments || []).length; });
+  });
+  return counts;
+}
+
+function checkNewComments(oldCounts) {
+  Object.keys(state.schedule || {}).forEach(dayKey => {
+    const entry = state.schedule[dayKey];
+    if (!entry) return;
+    const jobs = Array.isArray(entry.jobs) ? entry.jobs : Object.values(entry.jobs || {});
+    jobs.forEach((job, idx) => {
+      const key = dayKey + '/' + idx;
+      const newCount = (job.comments || []).length;
+      const oldCount = oldCounts[key] ?? newCount;
+      if (newCount > oldCount) {
+        const c = job.comments[newCount - 1];
+        // Don't notify about your own comment
+        if (c && c.authorUid !== (currentUser && currentUser.uid)) {
+          showNotif('💬 New Comment', `${job.customer || 'Job'}: ${(c.text || '').slice(0, 100)}`);
+        }
+      }
+    });
+  });
+}
+
 function showLogin() {
   document.getElementById('loginCard').style.display = '';
   document.getElementById('registerCard').style.display = 'none';
@@ -768,7 +819,7 @@ function getAuthError(code) {
 function applyRole(role) {
   currentRole = role;
   document.body.classList.remove('view-only','role-admin','role-salesman','role-technician');
-  if (role === 'admin') document.body.classList.add('role-admin');
+  if (role === 'admin') { document.body.classList.add('role-admin'); requestNotifPermission(); }
   else if (role === 'salesman') document.body.classList.add('role-salesman');
   else if (role === 'technician') document.body.classList.add('role-technician');
   else document.body.classList.add('view-only');
@@ -798,6 +849,11 @@ function setupFirebaseListener() {
       const badge = document.getElementById('reqCount');
       badge.textContent = count;
       badge.style.display = count > 0 ? 'flex' : 'none';
+      if (isFirstReqSnap) { isFirstReqSnap = false; prevNewReqCount = count; }
+      else if (count > prevNewReqCount) {
+        showNotif('📋 New Service Request', `${count - prevNewReqCount} new request${count - prevNewReqCount > 1 ? 's' : ''} pending assignment`);
+        prevNewReqCount = count;
+      } else { prevNewReqCount = count; }
     });
   }
   if (VIEW_ONLY || currentRole === 'view-only') {
@@ -821,19 +877,22 @@ function setupFirebaseListener() {
         const localTs = state.lastModified || 0;
         const fbTs = fbData.lastModified || 0;
         if (fbTs > localTs) {
+          const oldCounts = isFirstSchedSnap ? null : snapshotCommentCounts();
           const savedWeekStart = state.weekStart;
           const savedCurrentDay = currentDay;
           try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
           state.weekStart = savedWeekStart;
           currentDay = savedCurrentDay;
           localStorage.setItem(STORAGE_KEY, JSON.stringify(fbData));
+          if (isFirstSchedSnap) { isFirstSchedSnap = false; }
+          else if (oldCounts) { checkNewComments(oldCounts); }
           try { render(); } catch(e) {}
           if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
             const d = getDayData(commentContext.dayKey);
             const job = d.jobs[commentContext.jobIdx];
             if (job) renderCommentList(job.comments || []);
           }
-        }
+        } else if (isFirstSchedSnap) { isFirstSchedSnap = false; }
       }
       setSyncStatus('synced');
     }, () => setSyncStatus('offline'));
