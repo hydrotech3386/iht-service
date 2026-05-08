@@ -670,17 +670,12 @@
 
 <!-- Telegram Settings Modal -->
 <div class="modal-bg" id="tgSettingsBg">
-  <div class="modal" style="max-width:420px">
+  <div class="modal" style="max-width:380px">
     <h2>🔔 Telegram Notifications</h2>
-    <p style="font-size:13px;color:#aaa;margin-bottom:12px">Receive instant Telegram messages when jobs are assigned, updated, or commented on.</p>
-    <ol style="font-size:13px;color:#ccc;margin-bottom:16px;padding-left:18px;line-height:1.8">
-      <li>Open Telegram → find your <b>IHT Service Bot</b> → send any message</li>
-      <li>Visit <a href="https://api.telegram.org/bot8371008663:AAFZVlpuQ9PAsYu1nTOUDBVr9lvAWLrnHQw/getUpdates" target="_blank" style="color:#4fc3f7">this link</a> → copy the <code style="background:#333;padding:1px 4px;border-radius:3px">"id"</code> number inside <code style="background:#333;padding:1px 4px;border-radius:3px">"chat"</code></li>
-      <li>Paste it below and save</li>
-    </ol>
+    <p style="font-size:13px;color:#aaa;margin-bottom:16px">Click Save to receive job notifications on Telegram.</p>
     <div class="form-row">
-      <label>Your Telegram Chat ID</label>
-      <input type="text" id="tgChatIdInput" placeholder="e.g. 768921833" inputmode="numeric">
+      <label>Telegram Chat ID</label>
+      <input type="text" id="tgChatIdInput" inputmode="numeric">
     </div>
     <div id="tgSaveMsg" style="font-size:12px;color:#4caf50;min-height:16px;margin-top:4px"></div>
     <div class="modal-actions">
@@ -765,7 +760,7 @@ function sendTelegramToUser(uid, text) {
 function openTgSettings() {
   if (!currentUser) return;
   firebase.database().ref('users/' + currentUser.uid + '/telegramChatId').once('value').then(snap => {
-    document.getElementById('tgChatIdInput').value = snap.val() || '';
+    document.getElementById('tgChatIdInput').value = snap.val() || '768921833';
     document.getElementById('tgSaveMsg').textContent = '';
     document.getElementById('tgSettingsBg').classList.add('open');
   });
