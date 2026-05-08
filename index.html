@@ -692,6 +692,22 @@
   </div>
 </div>
 
+<!-- Reschedule Modal -->
+<div class="modal-bg" id="rescheduleBg">
+  <div class="modal" style="max-width:340px">
+    <h2>📅 Reschedule Job</h2>
+    <div id="rescheduleInfo" style="font-size:13px;color:#ccc;margin-bottom:14px;padding:10px 12px;background:#0f3460;border-radius:6px"></div>
+    <div class="form-row">
+      <label>Move to Date</label>
+      <input type="date" id="rescheduleDate">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('rescheduleBg').classList.remove('open')">Cancel</button>
+      <button class="btn-confirm" onclick="confirmReschedule()">📅 Move Job</button>
+    </div>
+  </div>
+</div>
+
 <!-- Manage Users Modal -->
 <div class="modal-bg" id="usersBg">
   <div class="modal" style="max-width:540px">
@@ -1703,6 +1719,7 @@ function renderDay() {
       <div class="job-actions">
         <button class="btn-comment" onclick="openComments('${currentDay}',${idx})" title="Comments">💬${cmtCount ? `<span class="comment-badge">${cmtCount}</span>` : ''}</button>
         <button class="btn-edit-job" onclick="editJob(${idx})" title="Edit">✏</button>
+        <button class="btn-edit-job" onclick="openReschedule(${idx})" title="Reschedule">📅</button>
         <button class="btn-edit-job" onclick="moveJob(${idx},-1)" title="Move Up">▲</button>
         <button class="btn-edit-job" onclick="moveJob(${idx},1)" title="Move Down">▼</button>
         <button class="btn-edit-job" onclick="deleteJob(${idx})" title="Delete">✕</button>
@@ -1954,6 +1971,45 @@ function saveJob() {
 }
 
 function editJob(idx) { openModal(idx); }
+
+let reschedulingIdx = null;
+
+function openReschedule(idx) {
+  reschedulingIdx = idx;
+  const job = getDayData(currentDay).jobs[idx];
+  if (!job) return;
+  const info = document.getElementById('rescheduleInfo');
+  info.innerHTML = `<b>${job.customer || 'Job'}</b>${job.address ? `<br><span style="color:#aaa;font-size:12px">📍 ${job.address}</span>` : ''}<br><span style="color:#666;font-size:11px">Currently: ${currentDay}</span>`;
+  document.getElementById('rescheduleDate').value = currentDay;
+  document.getElementById('rescheduleBg').classList.add('open');
+  setTimeout(() => document.getElementById('rescheduleDate').focus(), 100);
+}
+
+function confirmReschedule() {
+  const newDate = document.getElementById('rescheduleDate').value;
+  if (!newDate) { alert('Please select a date.'); return; }
+  if (newDate === currentDay) { document.getElementById('rescheduleBg').classList.remove('open'); return; }
+  const srcData = getDayData(currentDay);
+  const job = srcData.jobs[reschedulingIdx];
+  if (!job) return;
+  // Move job
+  srcData.jobs.splice(reschedulingIdx, 1);
+  getDayData(newDate).jobs.push(job);
+  // Notify salesman
+  if (job.salesmanUid) {
+    const [y,m,d] = newDate.split('-').map(Number);
+    const dateStr = new Date(y, m-1, d).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+    sendTelegramToUser(job.salesmanUid,
+      `📅 <b>Job Rescheduled</b>\n👤 <b>${job.customer || 'Job'}</b>${job.address ? `\n📍 ${job.address}` : ''}\nNew date: <b>${dateStr}</b>`);
+  }
+  document.getElementById('rescheduleBg').classList.remove('open');
+  // Navigate to the new week/day
+  const [y,m,d] = newDate.split('-').map(Number);
+  state.weekStart = getMonday(new Date(y, m-1, d));
+  currentDay = newDate;
+  persistState();
+  render();
+}
 
 function deleteJob(idx) {
   if (!confirm('Delete this job?')) return;
@@ -2575,7 +2631,7 @@ function loadWeek(monKey) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
-    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg'].forEach(id => {
+    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg'].forEach(id => {
       document.getElementById(id).classList.remove('open');
     });
   }
