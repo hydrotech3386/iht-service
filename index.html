@@ -204,6 +204,7 @@
   .view-only-badge{display:none;background:#2980b9;color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:2px 7px;letter-spacing:.5px;white-space:nowrap}
   .view-only .view-only-badge{display:inline-block}
   /* Salesman */
+  .role-salesman .btn-add{display:none}
   .role-salesman .btn-edit-job{display:none}
   .role-salesman .btn-del-week{display:none}
   .role-salesman .btn-copy{display:none}
@@ -262,6 +263,40 @@
   .absence-badge{font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle}
   .absence-badge.leave{background:#e67e22;color:#fff}
   .absence-badge.mc{background:#9b59b6;color:#fff}
+
+  /* Service Requests */
+  .btn-request{background:#e67e22;color:#fff}
+  .btn-request:hover{background:#ca6f1e}
+  .btn-requests{background:#8e44ad;color:#fff;position:relative}
+  .btn-requests:hover{background:#6c3483}
+  .req-count{position:absolute;top:-6px;right:-6px;background:#e94560;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .role-admin .btn-request{display:none}
+  .role-technician .btn-request{display:none}
+  .view-only .btn-request{display:none}
+  .role-salesman .btn-requests{display:none}
+  .role-technician .btn-requests{display:none}
+  .view-only .btn-requests{display:none}
+  .request-item{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start}
+  .request-item.req-scheduled{opacity:0.6;border-color:#27ae60}
+  .request-item.req-cancelled{opacity:0.4}
+  .req-item-body{flex:1;min-width:0}
+  .req-customer{font-size:14px;font-weight:700;color:#fff;margin-bottom:3px}
+  .req-detail{font-size:12px;color:#4fc3f7;margin-right:10px}
+  .req-desc{font-size:12px;color:#bbb;margin-top:4px;line-height:1.4}
+  .req-meta{font-size:11px;color:#555;margin-top:6px}
+  .req-pref-date{color:#f39c12;font-weight:600}
+  .req-sched-badge{display:inline-block;background:#0a1f0a;color:#27ae60;border:1px solid #27ae60;border-radius:4px;font-size:10px;font-weight:700;padding:1px 6px;margin-left:6px}
+  .req-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+  .btn-assign{background:#27ae60;border:none;color:#fff;border-radius:6px;padding:8px 14px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap}
+  .btn-assign:hover{background:#1e8449}
+  .btn-req-del{background:#1a1a2e;border:1px solid #333;color:#666;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px}
+  .btn-req-del:hover{background:#e94560;color:#fff;border-color:#e94560}
+  .req-filter-row{display:flex;gap:6px;margin-bottom:12px}
+  .req-filter-btn{background:#0f3460;border:none;color:#aaa;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:600}
+  .req-filter-btn.active{background:#e94560;color:#fff}
+  .req-filter-btn:hover:not(.active){background:#1a3a6a;color:#fff}
+  .req-list{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto}
+  .assign-info{background:#0f3460;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#4fc3f7}
 
   /* Manage users */
   .users-list{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;margin:12px 0}
@@ -426,6 +461,8 @@
 
 <div class="toolbar">
   <button class="btn-add" onclick="openModal()">+ Add Job</button>
+  <button class="btn-request" onclick="openServiceRequest()">📋 New Request</button>
+  <button class="btn-requests" id="btnRequests" onclick="openRequestsPanel()">📬 Requests<span class="req-count" id="reqCount" style="display:none">0</span></button>
   <button class="btn-copy" onclick="showWAPreview()">📋 Copy for WhatsApp</button>
   <button class="btn-summary" onclick="openSummary()">📊 Internal Billing</button>
   <button class="btn-load" onclick="toggleHistory()">📁 History</button>
@@ -560,6 +597,75 @@
   </div>
 </div>
 
+<!-- Service Request Modal (Salesman) -->
+<div class="modal-bg" id="svcReqBg">
+  <div class="modal" style="max-width:520px">
+    <h2>📋 New Service Request</h2>
+    <div class="form-row">
+      <label>Customer / Location *</label>
+      <input type="text" id="srCustomer" placeholder="e.g. Ms. Yammy or Bumi Proaktif - Gerik">
+    </div>
+    <div class="form-row">
+      <label>Contact Number</label>
+      <input type="text" id="srContact" placeholder="012-3456789">
+    </div>
+    <div class="form-row">
+      <label>Address</label>
+      <input type="text" id="srAddress" placeholder="No. 2, Jalan ABC, Ipoh">
+    </div>
+    <div class="form-row">
+      <label>Preferred Service Date</label>
+      <input type="date" id="srDate">
+    </div>
+    <div class="form-row">
+      <label>Job Description / Issue</label>
+      <textarea id="srDesc" placeholder="Describe the service needed…" style="min-height:80px"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('svcReqBg').classList.remove('open')">Cancel</button>
+      <button class="btn-confirm" onclick="submitServiceRequest()">Submit Request</button>
+    </div>
+  </div>
+</div>
+
+<!-- Requests Panel (Admin) -->
+<div class="modal-bg" id="requestsBg">
+  <div class="modal" style="max-width:680px">
+    <h2>📬 Service Requests</h2>
+    <div class="req-filter-row">
+      <button class="req-filter-btn active" onclick="filterRequests(this,'new')">🔵 New</button>
+      <button class="req-filter-btn" onclick="filterRequests(this,'scheduled')">✅ Scheduled</button>
+      <button class="req-filter-btn" onclick="filterRequests(this,'all')">All</button>
+    </div>
+    <div class="req-list" id="requestsList">
+      <div style="color:#555;text-align:center;padding:20px;font-size:13px">Loading...</div>
+    </div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="btn-cancel" onclick="document.getElementById('requestsBg').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign to Schedule Modal (Admin) -->
+<div class="modal-bg" id="assignBg">
+  <div class="modal" style="max-width:480px">
+    <h2>📅 Assign to Schedule</h2>
+    <div class="assign-info" id="assignInfo"></div>
+    <div class="form-row">
+      <label>Schedule Date *</label>
+      <input type="date" id="assignDate">
+    </div>
+    <div class="form-row">
+      <label>Team Members</label>
+      <div class="member-grid" id="assignMemberGrid"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('assignBg').classList.remove('open');document.getElementById('requestsBg').classList.add('open')">Back</button>
+      <button class="btn-confirm" onclick="confirmAssign()">➕ Add to Schedule</button>
+    </div>
+  </div>
+</div>
+
 <!-- Manage Users Modal -->
 <div class="modal-bg" id="usersBg">
   <div class="modal" style="max-width:540px">
@@ -634,6 +740,8 @@ function registerUser() {
 
 function logoutUser() {
   if (fbRef) fbRef.off();
+  if (fbReqRef) { fbReqRef.off(); fbReqRef = null; }
+  document.getElementById('reqCount').style.display = 'none';
   firebase.auth().signOut().then(() => {
     currentUser = null;
     applyRole('view-only');
@@ -683,6 +791,17 @@ function updateUserInfo(name, role) {
 
 function setupFirebaseListener() {
   setSyncStatus('syncing');
+  // Live request badge for admin
+  if (currentRole === 'admin') {
+    fbReqRef = firebase.database().ref('requests');
+    fbReqRef.on('value', snap => {
+      let count = 0;
+      snap.forEach(child => { if (child.val().status === 'new') count++; });
+      const badge = document.getElementById('reqCount');
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'flex' : 'none';
+    });
+  }
   if (VIEW_ONLY || currentRole === 'view-only') {
     fbRef.on('value', snapshot => {
       const fbData = snapshot.val();
@@ -721,6 +840,182 @@ function setupFirebaseListener() {
       setSyncStatus('synced');
     }, () => setSyncStatus('offline'));
   }
+}
+
+// ---- Service Requests ----
+let currentReqFilter = 'new';
+let assigningReqKey = null;
+let assigningReq = null;
+let fbReqRef = null;
+
+function openServiceRequest() {
+  document.getElementById('srCustomer').value = '';
+  document.getElementById('srContact').value = '';
+  document.getElementById('srAddress').value = '';
+  document.getElementById('srDate').value = '';
+  document.getElementById('srDesc').value = '';
+  document.getElementById('svcReqBg').classList.add('open');
+  setTimeout(() => document.getElementById('srCustomer').focus(), 100);
+}
+
+function submitServiceRequest() {
+  const customer = document.getElementById('srCustomer').value.trim();
+  if (!customer) { alert('Please enter customer name.'); return; }
+  const userData = { name: document.getElementById('userName').textContent || '' };
+  const req = {
+    customer,
+    contact: document.getElementById('srContact').value.trim(),
+    address: document.getElementById('srAddress').value.trim(),
+    preferredDate: document.getElementById('srDate').value,
+    desc: document.getElementById('srDesc').value.trim(),
+    salesmanName: userData.name,
+    salesmanEmail: currentUser ? (currentUser.email || '') : '',
+    status: 'new',
+    createdAt: Date.now()
+  };
+  firebase.database().ref('requests').push(req)
+    .then(() => {
+      document.getElementById('svcReqBg').classList.remove('open');
+      alert('Request submitted! Admin will assign it to the schedule.');
+    })
+    .catch(e => alert('Failed to submit: ' + e.message));
+}
+
+function openRequestsPanel() {
+  currentReqFilter = 'new';
+  document.querySelectorAll('.req-filter-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+  document.getElementById('requestsBg').classList.add('open');
+  loadRequests();
+}
+
+function filterRequests(btn, filter) {
+  currentReqFilter = filter;
+  document.querySelectorAll('.req-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadRequests();
+}
+
+function loadRequests() {
+  const list = document.getElementById('requestsList');
+  list.innerHTML = '<div style="color:#555;text-align:center;padding:20px;font-size:13px">Loading...</div>';
+  firebase.database().ref('requests').once('value').then(snap => {
+    const all = [];
+    snap.forEach(child => { const r = child.val(); r._key = child.key; all.push(r); });
+    all.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+    const filtered = currentReqFilter === 'all' ? all : all.filter(r => r.status === currentReqFilter);
+    if (filtered.length === 0) {
+      list.innerHTML = `<div style="color:#555;text-align:center;padding:24px;font-size:13px">No ${currentReqFilter === 'all' ? '' : currentReqFilter} requests.</div>`;
+      return;
+    }
+    list.innerHTML = '';
+    filtered.forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'request-item' + (r.status==='scheduled'?' req-scheduled':r.status==='cancelled'?' req-cancelled':'');
+      const dateStr = new Date(r.createdAt||0).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+      const prefHtml = r.preferredDate ? `<span class="req-pref-date">Preferred: ${r.preferredDate}</span> · ` : '';
+      const schedHtml = r.scheduledTo ? `<span class="req-sched-badge">✓ ${r.scheduledTo}${r.scheduledTeam ? ' · '+r.scheduledTeam : ''}</span>` : '';
+      item.innerHTML = `
+        <div class="req-item-body">
+          <div class="req-customer">${r.customer}${schedHtml}</div>
+          <div style="margin:3px 0">${r.contact?`<span class="req-detail">📞 ${r.contact}</span>`:''}${r.address?`<span class="req-detail">📍 ${r.address}</span>`:''}</div>
+          ${r.desc?`<div class="req-desc">${r.desc}</div>`:''}
+          <div class="req-meta">${prefHtml}By ${r.salesmanName||r.salesmanEmail||'?'} · ${dateStr}</div>
+        </div>
+        <div class="req-actions">
+          ${r.status==='new'?`<button class="btn-assign" onclick="openAssign('${r._key}')">📅 Assign</button>`:''}
+          <button class="btn-req-del" onclick="deleteRequest('${r._key}')" title="Remove">✕</button>
+        </div>`;
+      list.appendChild(item);
+    });
+  }).catch(() => {
+    list.innerHTML = '<div style="color:#e94560;text-align:center;padding:20px;font-size:13px">Failed to load.</div>';
+  });
+}
+
+function openAssign(key) {
+  assigningReqKey = key;
+  firebase.database().ref('requests/' + key).once('value').then(snap => {
+    assigningReq = snap.val();
+    document.getElementById('assignInfo').innerHTML =
+      `<strong>${assigningReq.customer}</strong>` +
+      (assigningReq.contact ? ` &nbsp;📞 ${assigningReq.contact}` : '') +
+      (assigningReq.address ? `<br>📍 ${assigningReq.address}` : '') +
+      (assigningReq.desc ? `<br><span style="color:#aaa;font-size:12px">${assigningReq.desc}</span>` : '');
+    document.getElementById('assignDate').value = assigningReq.preferredDate || isoDate(new Date());
+    renderAssignMemberGrid([]);
+    document.getElementById('requestsBg').classList.remove('open');
+    document.getElementById('assignBg').classList.add('open');
+    setTimeout(() => document.getElementById('assignDate').focus(), 100);
+  });
+}
+
+function renderAssignMemberGrid(selected) {
+  const grid = document.getElementById('assignMemberGrid');
+  grid.innerHTML = '';
+  state.members.forEach(name => {
+    const checked = selected.includes(name);
+    const chip = document.createElement('label');
+    chip.className = 'member-chip' + (checked ? ' checked' : '');
+    chip.innerHTML = `<input type="checkbox" value="${name}" ${checked?'checked':''}>${name}`;
+    chip.querySelector('input').addEventListener('change', e => chip.classList.toggle('checked', e.target.checked));
+    grid.appendChild(chip);
+  });
+}
+
+function getAssignChecked() {
+  return [...document.querySelectorAll('#assignMemberGrid input:checked')].map(i => i.value);
+}
+
+function confirmAssign() {
+  if (!assigningReqKey || !assigningReq) return;
+  const date = document.getElementById('assignDate').value;
+  if (!date) { alert('Please select a date.'); return; }
+  const team = getAssignChecked();
+  // Add job to schedule
+  const dayData = getDayData(date);
+  dayData.jobs.push({
+    team: team.join(','),
+    customer: assigningReq.customer,
+    contact: assigningReq.contact || '',
+    address: assigningReq.address || '',
+    salesman: assigningReq.salesmanName || '',
+    desc: assigningReq.desc || '',
+    status: 'pending',
+    comments: [],
+    internalBilling: false,
+    ibAmount: 0
+  });
+  // Mark request scheduled
+  firebase.database().ref('requests/' + assigningReqKey).update({
+    status: 'scheduled',
+    scheduledTo: date,
+    scheduledTeam: team.join(', ')
+  }).catch(e => console.warn('Request update failed', e));
+  // Navigate to that week/day and save
+  const [y,m,d] = date.split('-').map(Number);
+  state.weekStart = getMonday(new Date(y, m-1, d));
+  currentDay = date;
+  document.getElementById('assignBg').classList.remove('open');
+  persistState();
+  render();
+}
+
+function deleteRequest(key) {
+  if (!confirm('Remove this request?')) return;
+  firebase.database().ref('requests/' + key).remove()
+    .then(() => loadRequests())
+    .catch(e => alert('Failed: ' + e.message));
+}
+
+function updateRequestsBadge() {
+  if (!fbReady || currentRole !== 'admin') return;
+  firebase.database().ref('requests').once('value').then(snap => {
+    let count = 0;
+    snap.forEach(child => { if (child.val().status === 'new') count++; });
+    const badge = document.getElementById('reqCount');
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'flex' : 'none';
+  }).catch(() => {});
 }
 
 // ---- Manage Users ----
@@ -1898,9 +2193,9 @@ function loadWeek(monKey) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
-    document.getElementById('waBg').classList.remove('open');
-    document.getElementById('commentBg').classList.remove('open');
-    document.getElementById('usersBg').classList.remove('open');
+    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg'].forEach(id => {
+      document.getElementById(id).classList.remove('open');
+    });
   }
 });
 
