@@ -180,6 +180,9 @@
   .role-badge.pending{background:#555;color:#aaa}
   .btn-logout{background:#1a1a2e;border:1px solid #444;color:#aaa;padding:4px 9px;border-radius:4px;cursor:pointer;font-size:11px;white-space:nowrap}
   .btn-logout:hover{background:#e94560;color:#fff;border-color:#e94560}
+  .btn-tg{background:#1a1a2e;border:1px solid #444;color:#aaa;padding:4px 7px;border-radius:4px;cursor:pointer;font-size:13px;line-height:1}
+  .btn-tg:hover{background:#0088cc;border-color:#0088cc;color:#fff}
+  .btn-tg.connected{color:#4fc3f7;border-color:#0088cc}
   .btn-users{background:#6c3483;color:#fff}
   .btn-users:hover{background:#5b2c6f}
 
@@ -446,6 +449,7 @@
   <div class="user-info" id="userInfo" style="display:none">
     <span class="user-name" id="userName"></span>
     <span class="role-badge" id="userRoleBadge"></span>
+    <button class="btn-tg" onclick="openTgSettings()" title="Telegram Notifications">🔔</button>
     <button class="btn-logout" onclick="logoutUser()">Sign Out</button>
   </div>
   <div class="sync-status"><div class="sync-dot syncing" id="syncDot"></div><span id="syncLabel">Connecting...</span></div>
@@ -664,6 +668,28 @@
   </div>
 </div>
 
+<!-- Telegram Settings Modal -->
+<div class="modal-bg" id="tgSettingsBg">
+  <div class="modal" style="max-width:420px">
+    <h2>🔔 Telegram Notifications</h2>
+    <p style="font-size:13px;color:#aaa;margin-bottom:12px">Receive instant Telegram messages when jobs are assigned, updated, or commented on.</p>
+    <ol style="font-size:13px;color:#ccc;margin-bottom:16px;padding-left:18px;line-height:1.8">
+      <li>Open Telegram → find your <b>IHT Service Bot</b> → send any message</li>
+      <li>Visit <a href="https://api.telegram.org/bot8371008663:AAFZVlpuQ9PAsYu1nTOUDBVr9lvAWLrnHQw/getUpdates" target="_blank" style="color:#4fc3f7">this link</a> → copy the <code style="background:#333;padding:1px 4px;border-radius:3px">"id"</code> number inside <code style="background:#333;padding:1px 4px;border-radius:3px">"chat"</code></li>
+      <li>Paste it below and save</li>
+    </ol>
+    <div class="form-row">
+      <label>Your Telegram Chat ID</label>
+      <input type="text" id="tgChatIdInput" placeholder="e.g. 768921833" inputmode="numeric">
+    </div>
+    <div id="tgSaveMsg" style="font-size:12px;color:#4caf50;min-height:16px;margin-top:4px"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('tgSettingsBg').classList.remove('open')">Cancel</button>
+      <button class="btn-confirm" onclick="saveTelegramChatId()">💾 Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Manage Users Modal -->
 <div class="modal-bg" id="usersBg">
   <div class="modal" style="max-width:540px">
@@ -690,7 +716,6 @@ const STATUS_LABELS = {'pending':'Pending','in-progress':'In Progress','complete
 
 // ---- Notifications ----
 const TG_TOKEN = '8371008663:AAFZVlpuQ9PAsYu1nTOUDBVr9lvAWLrnHQw';
-const TG_CHAT_ID = '768921833';
 
 let notifEnabled = false;
 let prevNewReqCount = 0;
@@ -711,12 +736,51 @@ function showNotif(title, body) {
   try { new Notification(title, { body }); } catch(e) {}
 }
 
-function sendTelegram(text) {
+function sendTelegram(chatId, text) {
+  if (!chatId) return;
   fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: TG_CHAT_ID, text, parse_mode: 'HTML' })
+    body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' })
   }).catch(() => {});
+}
+
+function sendTelegramToAdmins(text) {
+  firebase.database().ref('users').once('value').then(snap => {
+    snap.forEach(child => {
+      const u = child.val();
+      if (u.role === 'admin' && u.telegramChatId) sendTelegram(u.telegramChatId, text);
+    });
+  }).catch(() => {});
+}
+
+function sendTelegramToUser(uid, text) {
+  if (!uid) return;
+  firebase.database().ref('users/' + uid + '/telegramChatId').once('value').then(snap => {
+    const chatId = snap.val();
+    if (chatId) sendTelegram(chatId, text);
+  }).catch(() => {});
+}
+
+function openTgSettings() {
+  if (!currentUser) return;
+  firebase.database().ref('users/' + currentUser.uid + '/telegramChatId').once('value').then(snap => {
+    document.getElementById('tgChatIdInput').value = snap.val() || '';
+    document.getElementById('tgSaveMsg').textContent = '';
+    document.getElementById('tgSettingsBg').classList.add('open');
+  });
+}
+
+function saveTelegramChatId() {
+  const chatId = document.getElementById('tgChatIdInput').value.trim();
+  if (!chatId || !currentUser) return;
+  firebase.database().ref('users/' + currentUser.uid).update({ telegramChatId: chatId })
+    .then(() => {
+      document.getElementById('tgSaveMsg').textContent = '✓ Connected! You will receive Telegram notifications.';
+      document.querySelector('.btn-tg').classList.add('connected');
+      setTimeout(() => document.getElementById('tgSettingsBg').classList.remove('open'), 1500);
+    })
+    .catch(e => alert('Failed: ' + e.message));
 }
 
 function snapshotCommentCounts() {
@@ -745,8 +809,12 @@ function checkNewComments(oldCounts) {
         if (c && c.authorUid !== (currentUser && currentUser.uid)) {
           const preview = (c.text || '').slice(0, 100);
           const author = c.authorName || 'Someone';
+          const tgMsg = `💬 <b>New Comment</b>\n<b>${job.customer || 'Job'}</b>\n${author}: ${preview}`;
           showNotif('💬 New Comment', `${job.customer || 'Job'}: ${preview}`);
-          sendTelegram(`💬 <b>New Comment</b>\n<b>${job.customer || 'Job'}</b>\n${author}: ${preview}`);
+          sendTelegramToAdmins(tgMsg);
+          if (job.salesmanUid && job.salesmanUid !== c.authorUid) {
+            sendTelegramToUser(job.salesmanUid, `💬 <b>New Comment on Your Job</b>\n<b>${job.customer || 'Job'}</b>\n${author}: ${preview}`);
+          }
         }
       }
     });
@@ -850,6 +918,12 @@ function updateUserInfo(name, role) {
   const badge = document.getElementById('userRoleBadge');
   badge.textContent = role.toUpperCase();
   badge.className = 'role-badge ' + role;
+  // Indicate if Telegram is connected
+  if (currentUser) {
+    firebase.database().ref('users/' + currentUser.uid + '/telegramChatId').once('value').then(snap => {
+      document.querySelector('.btn-tg').classList.toggle('connected', !!snap.val());
+    });
+  }
 }
 
 function setupFirebaseListener() {
@@ -868,7 +942,7 @@ function setupFirebaseListener() {
         const n = count - prevNewReqCount;
         const msg = `📋 <b>New Service Request</b>\n${n} new request${n > 1 ? 's' : ''} pending assignment`;
         showNotif('📋 New Service Request', `${n} new request${n > 1 ? 's' : ''} pending assignment`);
-        sendTelegram(msg);
+        sendTelegramToAdmins(msg);
         prevNewReqCount = count;
       } else { prevNewReqCount = count; }
     });
@@ -944,6 +1018,7 @@ function submitServiceRequest() {
     desc: document.getElementById('srDesc').value.trim(),
     salesmanName: userData.name,
     salesmanEmail: currentUser ? (currentUser.email || '') : '',
+    submittedByUid: currentUser ? currentUser.uid : null,
     status: 'new',
     createdAt: Date.now()
   };
@@ -1053,12 +1128,19 @@ function confirmAssign() {
     contact: assigningReq.contact || '',
     address: assigningReq.address || '',
     salesman: assigningReq.salesmanName || '',
+    salesmanUid: assigningReq.submittedByUid || null,
     desc: assigningReq.desc || '',
     status: 'pending',
     comments: [],
     internalBilling: false,
     ibAmount: 0
   });
+  // Notify salesman their request was assigned
+  if (assigningReq.submittedByUid) {
+    const teamStr = team.length ? `\nTeam: ${team.join(', ')}` : '';
+    sendTelegramToUser(assigningReq.submittedByUid,
+      `✅ <b>Job Assigned</b>\n<b>${assigningReq.customer}</b>\nScheduled: ${date}${teamStr}`);
+  }
   // Mark request scheduled
   firebase.database().ref('requests/' + assigningReqKey).update({
     status: 'scheduled',
@@ -1142,6 +1224,10 @@ function updateJobStatus(idx) {
   const cur = job.status || 'pending';
   const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
   job.status = next;
+  if (job.salesmanUid && job.salesmanUid !== (currentUser && currentUser.uid)) {
+    sendTelegramToUser(job.salesmanUid,
+      `🔄 <b>Job Status Updated</b>\n<b>${job.customer || 'Job'}</b>\nStatus: ${STATUS_LABELS[next]}`);
+  }
   persistState();
   renderDay();
 }
