@@ -618,6 +618,21 @@
   </div>
 </div>
 
+<!-- Files modal -->
+<div class="modal-bg" id="filesBg">
+  <div class="modal" style="max-width:500px">
+    <h2 id="filesTitle">📎 Files</h2>
+    <div id="filesList" style="min-height:60px;max-height:360px;overflow-y:auto"></div>
+    <button class="photo-upload-btn" id="fileUploadBtn" onclick="triggerFileUpload()" style="margin-top:12px">📎 Add File</button>
+    <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt" style="display:none" onchange="handleFileUpload(event)">
+    <div id="fileUploadMsg" style="font-size:12px;color:#aaa;min-height:16px;text-align:center;margin-top:6px"></div>
+    <div style="font-size:11px;color:#555;text-align:center">Max 5 MB per file</div>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="btn-cancel" onclick="closeFilesBg()">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Lightbox -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
   <button class="lightbox-close" onclick="closeLightbox()">✕</button>
@@ -662,6 +677,12 @@
     <div class="form-row">
       <label>Job Description / Issue</label>
       <textarea id="srDesc" placeholder="Describe the service needed…" style="min-height:80px"></textarea>
+    </div>
+    <div class="form-row">
+      <label>Attachments <span style="color:#555;font-weight:normal;font-size:11px">(PDF, Word, Excel, images — max 5 MB each)</span></label>
+      <button type="button" onclick="triggerReqFileUpload()" style="background:#0f3460;border:1px solid #333;color:#ccc;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:12px;margin-bottom:6px">📎 Attach File</button>
+      <input type="file" id="reqFileInput" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,.txt" style="display:none" onchange="handleReqFileAttach(event)">
+      <div id="reqFileList"></div>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="document.getElementById('svcReqBg').classList.remove('open')">Cancel</button>
@@ -1149,13 +1170,17 @@ let assigningReq = null;
 let fbReqRef = null;
 let editingReqKey = null;
 
+let currentReqFiles = [];
+
 function openServiceRequest() {
   editingReqKey = null;
+  currentReqFiles = [];
   document.getElementById('srCustomer').value = '';
   document.getElementById('srContact').value = '';
   document.getElementById('srAddress').value = '';
   document.getElementById('srDate').value = '';
   document.getElementById('srDesc').value = '';
+  renderReqFileList();
   document.querySelector('#svcReqBg h2').textContent = '📋 New Service Request';
   document.querySelector('#svcReqBg .btn-confirm').textContent = 'Submit Request';
   document.getElementById('svcReqBg').classList.add('open');
@@ -1167,11 +1192,13 @@ function editRequest(key) {
     const r = snap.val();
     if (!r) return;
     editingReqKey = key;
+    currentReqFiles = r.files || [];
     document.getElementById('srCustomer').value = r.customer || '';
     document.getElementById('srContact').value = r.contact || '';
     document.getElementById('srAddress').value = r.address || '';
     document.getElementById('srDate').value = r.preferredDate || '';
     document.getElementById('srDesc').value = r.desc || '';
+    renderReqFileList();
     document.querySelector('#svcReqBg h2').textContent = '✏️ Edit Request';
     document.querySelector('#svcReqBg .btn-confirm').textContent = 'Update Request';
     document.getElementById('requestsBg').classList.remove('open');
@@ -1188,7 +1215,8 @@ function submitServiceRequest() {
     contact: document.getElementById('srContact').value.trim(),
     address: document.getElementById('srAddress').value.trim(),
     preferredDate: document.getElementById('srDate').value,
-    desc: document.getElementById('srDesc').value.trim()
+    desc: document.getElementById('srDesc').value.trim(),
+    files: currentReqFiles.length ? currentReqFiles : null
   };
   if (editingReqKey) {
     // Update existing request
@@ -1274,6 +1302,8 @@ function loadRequests() {
         ? `<button class="btn-req-del" onclick="deleteRequest('${r._key}')" title="Remove">✕</button>` : '';
       const photoBtn = (currentRole === 'admin' || isOwn)
         ? `<button class="btn-assign" onclick="openPhotosForRequest('${r._key}')" style="background:#6c5ce7" title="Photos">📷</button>` : '';
+      const reqFilesBtn = (currentRole === 'admin' || isOwn)
+        ? `<button class="btn-assign" onclick="openFilesForRequest('${r._key}')" style="background:#00897b" title="Files">📎</button>` : '';
       item.innerHTML = `
         <div class="req-item-body">
           <div class="req-customer">${r.customer}${schedHtml}</div>
@@ -1281,7 +1311,7 @@ function loadRequests() {
           ${r.desc?`<div class="req-desc">${r.desc}</div>`:''}
           <div class="req-meta">${prefHtml}By ${r.salesmanName||r.salesmanEmail||'?'} · ${dateStr}</div>
         </div>
-        <div class="req-actions">${adminActions}${editBtn}${photoBtn}${delBtn}</div>`;
+        <div class="req-actions">${adminActions}${editBtn}${photoBtn}${reqFilesBtn}${delBtn}</div>`;
       list.appendChild(item);
     });
   }).catch(() => {
@@ -1774,6 +1804,7 @@ function renderDay() {
       <div class="job-actions">
         <button class="btn-comment" onclick="openComments('${currentDay}',${idx})" title="Comments">💬${cmtCount ? `<span class="comment-badge">${cmtCount}</span>` : ''}</button>
         <button class="btn-photo" onclick="openPhotos('${currentDay}',${idx})" title="Photos" style="position:relative">📷${(job.photos||[]).length ? `<span class="photo-badge">${(job.photos||[]).length}</span>` : ''}</button>
+        <button class="btn-photo" onclick="openFiles('${currentDay}',${idx})" title="Files" style="position:relative">📎${(job.files||[]).length ? `<span class="photo-badge">${(job.files||[]).length}</span>` : ''}</button>
         <button class="btn-edit-job" onclick="editJob(${idx})" title="Edit">✏</button>
         <button class="btn-edit-job" onclick="openReschedule(${idx})" title="Reschedule">📅</button>
         <button class="btn-edit-job" onclick="moveJob(${idx},-1)" title="Move Up">▲</button>
@@ -2558,6 +2589,207 @@ function deletePhoto(idx) {
   renderDay();
 }
 
+// ---- File Attachments ----
+let fileContext = null;
+let renderedFiles = [];
+
+function openFiles(dayKey, jobIdx) {
+  const d = getDayData(dayKey);
+  const job = d.jobs[jobIdx];
+  if (!job) return;
+  fileContext = { dayKey, jobIdx };
+  document.getElementById('filesTitle').textContent = `📎 ${job.customer || 'Job ' + (jobIdx + 1)}`;
+  const canUpload = currentRole === 'admin' || currentRole === 'salesman';
+  document.getElementById('fileUploadBtn').style.display = canUpload ? 'block' : 'none';
+  document.getElementById('fileUploadMsg').textContent = '';
+  renderFileList(job.files || []);
+  document.getElementById('filesBg').classList.add('open');
+}
+
+function openFilesForRequest(reqKey) {
+  fileContext = { mode: 'request', reqKey };
+  firebase.database().ref('requests/' + reqKey).once('value').then(snap => {
+    const r = snap.val() || {};
+    document.getElementById('filesTitle').textContent = `📎 ${r.customer || 'Request'}`;
+    const isOwn = currentUser && r.submittedByUid === currentUser.uid;
+    const canUpload = currentRole === 'admin' || isOwn;
+    document.getElementById('fileUploadBtn').style.display = canUpload ? 'block' : 'none';
+    document.getElementById('fileUploadMsg').textContent = '';
+    renderFileList(r.files || []);
+    document.getElementById('requestsBg').classList.remove('open');
+    document.getElementById('filesBg').classList.add('open');
+  });
+}
+
+function closeFilesBg() {
+  document.getElementById('filesBg').classList.remove('open');
+  if (fileContext && fileContext.mode === 'request') {
+    document.getElementById('requestsBg').classList.add('open');
+  }
+}
+
+function canDeleteFile(f) {
+  if (currentRole === 'admin') return true;
+  if (!currentUser) return false;
+  return f.uploadedByUid && f.uploadedByUid === currentUser.uid;
+}
+
+function getFileIcon(type) {
+  if (!type) return '📄';
+  if (type.includes('pdf')) return '📕';
+  if (type.includes('word') || type.includes('doc')) return '📘';
+  if (type.includes('sheet') || type.includes('excel') || type.includes('xls')) return '📗';
+  if (type.includes('image') || type.includes('jpg') || type.includes('png')) return '🖼';
+  if (type.includes('zip')) return '🗜';
+  return '📄';
+}
+
+function renderFileList(files) {
+  renderedFiles = files;
+  const div = document.getElementById('filesList');
+  if (!files.length) {
+    div.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:24px">No files attached.</div>';
+    return;
+  }
+  div.innerHTML = files.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid #1a1a2e;font-size:13px">
+      <span style="font-size:20px;flex-shrink:0">${getFileIcon(f.type)}</span>
+      <div style="flex:1;min-width:0">
+        <div style="color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${f.name}">${f.name}</div>
+        <div style="color:#666;font-size:11px">${f.by || ''}${f.ts ? ' · ' + new Date(f.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
+      </div>
+      <button onclick="downloadFile(${i})" style="background:#0f3460;border:none;color:#aaa;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;flex-shrink:0">⬇</button>
+      ${canDeleteFile(f) ? `<button onclick="deleteFile(${i})" style="background:none;border:none;color:#e94560;cursor:pointer;font-size:16px;padding:4px;flex-shrink:0" title="Remove">✕</button>` : ''}
+    </div>`).join('');
+}
+
+function triggerFileUpload() {
+  document.getElementById('fileInput').value = '';
+  document.getElementById('fileInput').click();
+}
+
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file || !fileContext) return;
+  const msg = document.getElementById('fileUploadMsg');
+  if (file.size > 5 * 1024 * 1024) {
+    msg.style.color = '#e94560';
+    msg.textContent = 'File too large — max 5 MB.';
+    return;
+  }
+  msg.style.color = '#aaa';
+  msg.textContent = 'Reading file…';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const newFile = {
+      name: file.name,
+      type: file.type,
+      data: e.target.result,
+      ts: Date.now(),
+      by: document.getElementById('userName').textContent || '',
+      uploadedByUid: currentUser ? currentUser.uid : null
+    };
+    if (fileContext.mode === 'request') {
+      firebase.database().ref('requests/' + fileContext.reqKey + '/files').once('value').then(snap => {
+        const files = snap.val() || [];
+        files.push(newFile);
+        return firebase.database().ref('requests/' + fileContext.reqKey + '/files').set(files);
+      }).then(() => {
+        openFilesForRequest(fileContext.reqKey);
+      }).catch(() => { msg.style.color = '#e94560'; msg.textContent = 'Upload failed.'; });
+      return;
+    }
+    const d = getDayData(fileContext.dayKey);
+    const job = d.jobs[fileContext.jobIdx];
+    if (!job) return;
+    if (!job.files) job.files = [];
+    job.files.push(newFile);
+    persistState();
+    renderFileList(job.files);
+    renderDay();
+    msg.style.color = '#4caf50';
+    msg.textContent = '✓ File added.';
+    setTimeout(() => { msg.textContent = ''; }, 2000);
+  };
+  reader.onerror = () => { msg.style.color = '#e94560'; msg.textContent = 'Failed to read file.'; };
+  reader.readAsDataURL(file);
+}
+
+function downloadFile(idx) {
+  const f = renderedFiles[idx];
+  if (!f) return;
+  const a = document.createElement('a');
+  a.href = f.data;
+  a.download = f.name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+function deleteFile(idx) {
+  if (!confirm('Remove this file?')) return;
+  if (fileContext.mode === 'request') {
+    firebase.database().ref('requests/' + fileContext.reqKey + '/files').once('value').then(snap => {
+      const files = snap.val() || [];
+      files.splice(idx, 1);
+      return firebase.database().ref('requests/' + fileContext.reqKey + '/files').set(files);
+    }).then(() => {
+      openFilesForRequest(fileContext.reqKey);
+    }).catch(e => alert('Failed: ' + e.message));
+    return;
+  }
+  const d = getDayData(fileContext.dayKey);
+  const job = d.jobs[fileContext.jobIdx];
+  if (!job || !job.files) return;
+  job.files.splice(idx, 1);
+  persistState();
+  renderFileList(job.files);
+  renderDay();
+}
+
+// ---- Request form file attachments ----
+function triggerReqFileUpload() {
+  document.getElementById('reqFileInput').value = '';
+  document.getElementById('reqFileInput').click();
+}
+
+function handleReqFileAttach(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { alert('File too large — max 5 MB.'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    currentReqFiles.push({
+      name: file.name,
+      type: file.type,
+      data: e.target.result,
+      ts: Date.now(),
+      by: document.getElementById('userName').textContent || '',
+      uploadedByUid: currentUser ? currentUser.uid : null
+    });
+    renderReqFileList();
+  };
+  reader.onerror = () => alert('Failed to read file.');
+  reader.readAsDataURL(file);
+}
+
+function renderReqFileList() {
+  const div = document.getElementById('reqFileList');
+  if (!div) return;
+  if (!currentReqFiles.length) { div.innerHTML = ''; return; }
+  div.innerHTML = currentReqFiles.map((f, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;color:#ccc">
+      <span>${getFileIcon(f.type)}</span>
+      <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</span>
+      <button onclick="removeReqFile(${i})" style="background:none;border:none;color:#e94560;cursor:pointer;font-size:14px;padding:0 4px" title="Remove">✕</button>
+    </div>`).join('');
+}
+
+function removeReqFile(idx) {
+  currentReqFiles.splice(idx, 1);
+  renderReqFileList();
+}
+
 function openLightbox(idx) {
   const d = getDayData(photoContext.dayKey);
   const job = d.jobs[photoContext.jobIdx];
@@ -2854,7 +3086,7 @@ function loadWeek(monKey) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
-    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg'].forEach(id => {
+    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg'].forEach(id => {
       document.getElementById(id).classList.remove('open');
     });
   }
