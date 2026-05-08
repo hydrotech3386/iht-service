@@ -1802,7 +1802,7 @@ function renderDay() {
         <div class="job-team">${job.team || ''}${showIB ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}</div>
         <div class="job-customer">${job.customer || ''}${job.contact ? ' <span class="contact">'+job.contact+'</span>' : ''}${job.address ? ' '+job.address : ''}${job.salesman ? ' ('+job.salesman+')' : ''}</div>
         ${job.desc ? `<div class="job-desc">${job.desc}</div>` : ''}
-        ${job.location ? `<div style="margin-top:3px"><a href="https://maps.google.com/?q=${job.location.lat},${job.location.lng}" target="_blank" rel="noopener" style="color:#6c5ce7;font-size:11px;text-decoration:none">📍 ${job.location.by || ''} · ${new Date(job.location.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</a></div>` : ''}
+        ${job.location ? `<div style="margin-top:3px;display:flex;align-items:center;gap:6px"><a href="https://maps.google.com/?q=${job.location.lat},${job.location.lng}" target="_blank" rel="noopener" style="color:#6c5ce7;font-size:11px;text-decoration:none">📍 ${job.location.by || ''} · ${new Date(job.location.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</a>${(currentRole==='admin'||(currentUser&&job.location.uid===currentUser.uid))?`<button onclick="clearJobLocation('${currentDay}',${idx})" style="background:none;border:none;color:#555;cursor:pointer;font-size:11px;padding:0;line-height:1" title="Remove location">✕</button>`:''}</div>` : ''}
         <span class="status-badge ${status}${canClickStatus?' clickable':''}" ${canClickStatus?`onclick="updateJobStatus(${idx})"`:''}>${statusLabel}</span>
       </div>
       <div class="job-actions">
@@ -2806,6 +2806,7 @@ function shareJobLocation(dayKey, jobIdx) {
     job.location = {
       lat, lng,
       by: document.getElementById('userName').textContent || '',
+      uid: currentUser ? currentUser.uid : null,
       ts: Date.now()
     };
     persistState();
@@ -2820,6 +2821,15 @@ function shareJobLocation(dayKey, jobIdx) {
   }, () => {
     alert('Location access denied or unavailable. Please allow location permission in your browser.');
   }, { enableHighAccuracy: true, timeout: 10000 });
+}
+
+function clearJobLocation(dayKey, jobIdx) {
+  const d = getDayData(dayKey);
+  const job = d.jobs[jobIdx];
+  if (!job) return;
+  delete job.location;
+  persistState();
+  renderDay();
 }
 
 function fillMyLocation() {
