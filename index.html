@@ -274,7 +274,7 @@
   .role-admin .btn-request{display:none}
   .role-technician .btn-request{display:none}
   .view-only .btn-request{display:none}
-  .role-salesman .btn-requests{display:none}
+  /* salesman can see their own requests */
   .role-technician .btn-requests{display:none}
   .view-only .btn-requests{display:none}
   .request-item{background:#16213e;border:1px solid #0f3460;border-radius:8px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start}
@@ -1025,6 +1025,20 @@ function setupFirebaseListener() {
       }
     });
   }
+  // Live badge for salesman — their own pending requests
+  if (currentRole === 'salesman' && currentUser) {
+    fbReqRef = firebase.database().ref('requests');
+    fbReqRef.on('value', snap => {
+      let count = 0;
+      snap.forEach(child => {
+        const r = child.val();
+        if (r.status === 'new' && r.submittedByUid === currentUser.uid) count++;
+      });
+      const badge = document.getElementById('reqCount');
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'flex' : 'none';
+    });
+  }
   if (VIEW_ONLY || currentRole === 'view-only') {
     fbRef.on('value', snapshot => {
       const fbData = snapshot.val();
@@ -1077,44 +1091,82 @@ let currentReqFilter = 'new';
 let assigningReqKey = null;
 let assigningReq = null;
 let fbReqRef = null;
+let editingReqKey = null;
 
 function openServiceRequest() {
+  editingReqKey = null;
   document.getElementById('srCustomer').value = '';
   document.getElementById('srContact').value = '';
   document.getElementById('srAddress').value = '';
   document.getElementById('srDate').value = '';
   document.getElementById('srDesc').value = '';
+  document.querySelector('#svcReqBg h2').textContent = '📋 New Service Request';
+  document.querySelector('#svcReqBg .btn-confirm').textContent = 'Submit Request';
   document.getElementById('svcReqBg').classList.add('open');
   setTimeout(() => document.getElementById('srCustomer').focus(), 100);
+}
+
+function editRequest(key) {
+  firebase.database().ref('requests/' + key).once('value').then(snap => {
+    const r = snap.val();
+    if (!r) return;
+    editingReqKey = key;
+    document.getElementById('srCustomer').value = r.customer || '';
+    document.getElementById('srContact').value = r.contact || '';
+    document.getElementById('srAddress').value = r.address || '';
+    document.getElementById('srDate').value = r.preferredDate || '';
+    document.getElementById('srDesc').value = r.desc || '';
+    document.querySelector('#svcReqBg h2').textContent = '✏️ Edit Request';
+    document.querySelector('#svcReqBg .btn-confirm').textContent = 'Update Request';
+    document.getElementById('requestsBg').classList.remove('open');
+    document.getElementById('svcReqBg').classList.add('open');
+    setTimeout(() => document.getElementById('srCustomer').focus(), 100);
+  });
 }
 
 function submitServiceRequest() {
   const customer = document.getElementById('srCustomer').value.trim();
   if (!customer) { alert('Please enter customer name.'); return; }
-  const userData = { name: document.getElementById('userName').textContent || '' };
-  const req = {
+  const fields = {
     customer,
     contact: document.getElementById('srContact').value.trim(),
     address: document.getElementById('srAddress').value.trim(),
     preferredDate: document.getElementById('srDate').value,
-    desc: document.getElementById('srDesc').value.trim(),
-    salesmanName: userData.name,
-    salesmanEmail: currentUser ? (currentUser.email || '') : '',
-    submittedByUid: currentUser ? currentUser.uid : null,
-    status: 'new',
-    createdAt: Date.now()
+    desc: document.getElementById('srDesc').value.trim()
   };
-  firebase.database().ref('requests').push(req)
-    .then(() => {
-      document.getElementById('svcReqBg').classList.remove('open');
-      alert('Request submitted! Admin will assign it to the schedule.');
-    })
-    .catch(e => alert('Failed to submit: ' + e.message));
+  if (editingReqKey) {
+    // Update existing request
+    firebase.database().ref('requests/' + editingReqKey).update(fields)
+      .then(() => {
+        editingReqKey = null;
+        document.getElementById('svcReqBg').classList.remove('open');
+        document.getElementById('requestsBg').classList.add('open');
+        loadRequests();
+      })
+      .catch(e => alert('Failed to update: ' + e.message));
+  } else {
+    // New request
+    const req = {
+      ...fields,
+      salesmanName: document.getElementById('userName').textContent || '',
+      salesmanEmail: currentUser ? (currentUser.email || '') : '',
+      submittedByUid: currentUser ? currentUser.uid : null,
+      status: 'new',
+      createdAt: Date.now()
+    };
+    firebase.database().ref('requests').push(req)
+      .then(() => {
+        document.getElementById('svcReqBg').classList.remove('open');
+        alert('Request submitted! Admin will assign it to the schedule.');
+      })
+      .catch(e => alert('Failed to submit: ' + e.message));
+  }
 }
 
 function openRequestsPanel() {
   currentReqFilter = 'new';
   document.querySelectorAll('.req-filter-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+  document.querySelector('#requestsBg h2').textContent = currentRole === 'salesman' ? '📋 My Requests' : '📬 Service Requests';
   document.getElementById('requestsBg').classList.add('open');
   loadRequests();
 }
@@ -1129,11 +1181,16 @@ function filterRequests(btn, filter) {
 function loadRequests() {
   const list = document.getElementById('requestsList');
   list.innerHTML = '<div style="color:#555;text-align:center;padding:20px;font-size:13px">Loading...</div>';
+  const isSalesman = currentRole === 'salesman';
   firebase.database().ref('requests').once('value').then(snap => {
     const all = [];
     snap.forEach(child => { const r = child.val(); r._key = child.key; all.push(r); });
-    all.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
-    const filtered = currentReqFilter === 'all' ? all : all.filter(r => r.status === currentReqFilter);
+    // Salesman sees only their own requests
+    const mine = isSalesman
+      ? all.filter(r => r.submittedByUid === (currentUser && currentUser.uid))
+      : all;
+    mine.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+    const filtered = currentReqFilter === 'all' ? mine : mine.filter(r => r.status === currentReqFilter);
     if (filtered.length === 0) {
       list.innerHTML = `<div style="color:#555;text-align:center;padding:24px;font-size:13px">No ${currentReqFilter === 'all' ? '' : currentReqFilter} requests.</div>`;
       return;
@@ -1145,6 +1202,14 @@ function loadRequests() {
       const dateStr = new Date(r.createdAt||0).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
       const prefHtml = r.preferredDate ? `<span class="req-pref-date">Preferred: ${r.preferredDate}</span> · ` : '';
       const schedHtml = r.scheduledTo ? `<span class="req-sched-badge">✓ ${r.scheduledTo}${r.scheduledTeam ? ' · '+r.scheduledTeam : ''}</span>` : '';
+      const isOwn = currentUser && r.submittedByUid === currentUser.uid;
+      const canEdit = isOwn && r.status === 'new';
+      const adminActions = !isSalesman && r.status === 'new'
+        ? `<button class="btn-assign" onclick="openAssign('${r._key}')">📅 Assign</button>` : '';
+      const editBtn = canEdit
+        ? `<button class="btn-assign" onclick="editRequest('${r._key}')" style="background:#2980b9">✏️ Edit</button>` : '';
+      const delBtn = (currentRole === 'admin' || canEdit)
+        ? `<button class="btn-req-del" onclick="deleteRequest('${r._key}')" title="Remove">✕</button>` : '';
       item.innerHTML = `
         <div class="req-item-body">
           <div class="req-customer">${r.customer}${schedHtml}</div>
@@ -1152,10 +1217,7 @@ function loadRequests() {
           ${r.desc?`<div class="req-desc">${r.desc}</div>`:''}
           <div class="req-meta">${prefHtml}By ${r.salesmanName||r.salesmanEmail||'?'} · ${dateStr}</div>
         </div>
-        <div class="req-actions">
-          ${r.status==='new'?`<button class="btn-assign" onclick="openAssign('${r._key}')">📅 Assign</button>`:''}
-          <button class="btn-req-del" onclick="deleteRequest('${r._key}')" title="Remove">✕</button>
-        </div>`;
+        <div class="req-actions">${adminActions}${editBtn}${delBtn}</div>`;
       list.appendChild(item);
     });
   }).catch(() => {
