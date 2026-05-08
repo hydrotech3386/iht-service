@@ -689,6 +689,9 @@ const STATUS_CYCLE = ['pending','in-progress','completed','cancelled'];
 const STATUS_LABELS = {'pending':'Pending','in-progress':'In Progress','completed':'Completed','cancelled':'Cancelled'};
 
 // ---- Notifications ----
+const TG_TOKEN = '8371008663:AAFZVlpuQ9PAsYu1nTOUDBVr9lvAWLrnHQw';
+const TG_CHAT_ID = '768921833';
+
 let notifEnabled = false;
 let prevNewReqCount = 0;
 let isFirstReqSnap = true;
@@ -706,6 +709,14 @@ function requestNotifPermission() {
 function showNotif(title, body) {
   if (!notifEnabled || Notification.permission !== 'granted') return;
   try { new Notification(title, { body }); } catch(e) {}
+}
+
+function sendTelegram(text) {
+  fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: TG_CHAT_ID, text, parse_mode: 'HTML' })
+  }).catch(() => {});
 }
 
 function snapshotCommentCounts() {
@@ -732,7 +743,10 @@ function checkNewComments(oldCounts) {
         const c = job.comments[newCount - 1];
         // Don't notify about your own comment
         if (c && c.authorUid !== (currentUser && currentUser.uid)) {
-          showNotif('💬 New Comment', `${job.customer || 'Job'}: ${(c.text || '').slice(0, 100)}`);
+          const preview = (c.text || '').slice(0, 100);
+          const author = c.authorName || 'Someone';
+          showNotif('💬 New Comment', `${job.customer || 'Job'}: ${preview}`);
+          sendTelegram(`💬 <b>New Comment</b>\n<b>${job.customer || 'Job'}</b>\n${author}: ${preview}`);
         }
       }
     });
@@ -851,7 +865,10 @@ function setupFirebaseListener() {
       badge.style.display = count > 0 ? 'flex' : 'none';
       if (isFirstReqSnap) { isFirstReqSnap = false; prevNewReqCount = count; }
       else if (count > prevNewReqCount) {
-        showNotif('📋 New Service Request', `${count - prevNewReqCount} new request${count - prevNewReqCount > 1 ? 's' : ''} pending assignment`);
+        const n = count - prevNewReqCount;
+        const msg = `📋 <b>New Service Request</b>\n${n} new request${n > 1 ? 's' : ''} pending assignment`;
+        showNotif('📋 New Service Request', `${n} new request${n > 1 ? 's' : ''} pending assignment`);
+        sendTelegram(msg);
         prevNewReqCount = count;
       } else { prevNewReqCount = count; }
     });
