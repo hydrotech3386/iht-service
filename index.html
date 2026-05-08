@@ -672,14 +672,17 @@
 <div class="modal-bg" id="tgSettingsBg">
   <div class="modal" style="max-width:380px">
     <h2>🔔 Telegram Notifications</h2>
-    <ol style="font-size:13px;color:#ccc;margin:0 0 16px;padding-left:20px;line-height:2">
-      <li>Open Telegram → search <b>@IHTServiceBot</b></li>
-      <li>Tap <b>Start</b></li>
-      <li>Click <b>Save</b> below</li>
+    <ol style="font-size:13px;color:#ccc;margin:0 0 14px;padding-left:20px;line-height:2.1">
+      <li>Open Telegram → search <b>@IHTServiceBot</b> → tap <b>Start</b></li>
+      <li>Send any message to the bot</li>
+      <li>Tap <b>Find My Chat ID</b> below</li>
+      <li>Click <b>Save</b></li>
     </ol>
+    <button id="tgFindBtn" onclick="findMyChatId()" style="width:100%;padding:9px;background:#0088cc;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-bottom:12px">🔍 Find My Chat ID</button>
+    <div id="tgFindMsg" style="font-size:12px;color:#aaa;min-height:16px;margin-bottom:8px"></div>
     <div class="form-row">
-      <label>Telegram Chat ID</label>
-      <input type="text" id="tgChatIdInput" inputmode="numeric">
+      <label>Your Chat ID</label>
+      <input type="text" id="tgChatIdInput" inputmode="numeric" placeholder="Tap Find My Chat ID above">
     </div>
     <div id="tgSaveMsg" style="font-size:12px;color:#4caf50;min-height:16px;margin-top:4px"></div>
     <div class="modal-actions">
@@ -764,10 +767,45 @@ function sendTelegramToUser(uid, text) {
 function openTgSettings() {
   if (!currentUser) return;
   firebase.database().ref('users/' + currentUser.uid + '/telegramChatId').once('value').then(snap => {
-    document.getElementById('tgChatIdInput').value = snap.val() || '768921833';
+    document.getElementById('tgChatIdInput').value = snap.val() || '';
     document.getElementById('tgSaveMsg').textContent = '';
+    document.getElementById('tgFindMsg').textContent = '';
     document.getElementById('tgSettingsBg').classList.add('open');
   });
+}
+
+function findMyChatId() {
+  const btn = document.getElementById('tgFindBtn');
+  const msg = document.getElementById('tgFindMsg');
+  btn.textContent = 'Searching...';
+  btn.disabled = true;
+  fetch(`https://api.telegram.org/bot${TG_TOKEN}/getUpdates`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok && data.result.length > 0) {
+        const latest = data.result[data.result.length - 1];
+        const chatId = (latest.message || latest.callback_query?.message)?.chat?.id;
+        if (chatId) {
+          document.getElementById('tgChatIdInput').value = chatId;
+          msg.style.color = '#4caf50';
+          msg.textContent = `✓ Found your Chat ID: ${chatId}`;
+        } else {
+          msg.style.color = '#e94560';
+          msg.textContent = 'Could not detect Chat ID. Try sending another message to the bot.';
+        }
+      } else {
+        msg.style.color = '#e94560';
+        msg.textContent = 'No messages found. Send any message to @IHTServiceBot first.';
+      }
+    })
+    .catch(() => {
+      msg.style.color = '#e94560';
+      msg.textContent = 'Connection failed. Please try again.';
+    })
+    .finally(() => {
+      btn.textContent = '🔍 Find My Chat ID';
+      btn.disabled = false;
+    });
 }
 
 function saveTelegramChatId() {
