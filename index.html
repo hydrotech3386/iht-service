@@ -262,6 +262,28 @@
   .absence-badge.leave{background:#e67e22;color:#fff}
   .absence-badge.mc{background:#9b59b6;color:#fff}
 
+  /* Photos */
+  .btn-photo{background:#1a2a40!important;border:1px solid #8e44ad!important;color:#c39bd3!important;position:relative}
+  .btn-photo:hover{background:#8e44ad!important;color:#fff!important}
+  .photo-badge{position:absolute;top:-5px;right:-5px;background:#e94560;color:#fff;border-radius:50%;width:14px;height:14px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:12px 0;max-height:55vh;overflow-y:auto}
+  .photo-thumb-wrap{position:relative;border-radius:8px;overflow:hidden;background:#0f3460}
+  .photo-thumb{width:100%;height:110px;object-fit:cover;cursor:pointer;display:block;transition:opacity .15s}
+  .photo-thumb:hover{opacity:.82}
+  .photo-thumb-info{font-size:10px;color:#aaa;padding:4px 7px;line-height:1.4;background:#0a1a30}
+  .photo-del-btn{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.65);border:none;color:#ccc;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center}
+  .photo-del-btn:hover{background:#e94560;color:#fff}
+  .photo-upload-label{display:inline-flex;align-items:center;gap:7px;background:#8e44ad;color:#fff;border-radius:8px;padding:9px 16px;cursor:pointer;font-size:13px;font-weight:600;margin-top:4px}
+  .photo-upload-label:hover{background:#6c3483}
+  .photo-progress{margin-top:8px;background:#0f3460;border-radius:4px;height:6px;overflow:hidden;display:none}
+  .photo-progress-bar{height:100%;background:#27ae60;width:0%;transition:width .15s}
+  .photo-empty{color:#555;font-size:13px;text-align:center;padding:24px 0}
+  .photo-viewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:1000;align-items:center;justify-content:center;flex-direction:column;gap:10px}
+  .photo-viewer img{max-width:95vw;max-height:85vh;border-radius:6px;object-fit:contain}
+  .photo-viewer-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .photo-viewer-close:hover{background:#e94560}
+  .photo-viewer-caption{color:#aaa;font-size:12px}
+
   /* Service Requests */
   .btn-request{background:#e67e22;color:#fff}
   .btn-request:hover{background:#ca6f1e}
@@ -396,6 +418,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -593,6 +616,31 @@
       <button class="btn-cancel" onclick="document.getElementById('summaryBg').classList.remove('open')">Close</button>
     </div>
   </div>
+</div>
+
+<!-- Photo Modal -->
+<div class="modal-bg" id="photoBg">
+  <div class="modal" style="max-width:560px">
+    <h2>📷 <span id="photoModalTitle">Photos</span></h2>
+    <div class="photo-grid" id="photoGrid"></div>
+    <div id="photoUploadArea">
+      <label class="photo-upload-label">
+        📷 Add Photo
+        <input type="file" id="photoFileInput" accept="image/*" style="display:none" onchange="uploadPhoto(this)">
+      </label>
+      <div class="photo-progress" id="photoProgress"><div class="photo-progress-bar" id="photoProgressBar"></div></div>
+    </div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="btn-cancel" onclick="document.getElementById('photoBg').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fullscreen Photo Viewer -->
+<div class="photo-viewer" id="photoViewer">
+  <button class="photo-viewer-close" onclick="document.getElementById('photoViewer').style.display='none'">✕</button>
+  <img id="photoViewerImg" src="" alt="" onclick="document.getElementById('photoViewer').style.display='none'">
+  <div class="photo-viewer-caption" id="photoViewerCaption"></div>
 </div>
 
 <!-- Service Request Modal (Salesman) -->
@@ -838,6 +886,120 @@ function setupFirebaseListener() {
       setSyncStatus('synced');
     }, () => setSyncStatus('offline'));
   }
+}
+
+// ---- Photos ----
+let photoContext = null; // {dayKey, jobIdx}
+
+function openPhotos(dayKey, jobIdx) {
+  const data = getDayData(dayKey);
+  const job = data.jobs[jobIdx];
+  if (!job) return;
+  photoContext = { dayKey, jobIdx };
+  document.getElementById('photoModalTitle').textContent = job.customer || `Job ${jobIdx+1}`;
+  const canUpload = currentRole === 'admin' || currentRole === 'technician';
+  document.getElementById('photoUploadArea').style.display = canUpload ? '' : 'none';
+  document.getElementById('photoFileInput').value = '';
+  document.getElementById('photoProgress').style.display = 'none';
+  renderPhotoGrid(job.photos || []);
+  document.getElementById('photoBg').classList.add('open');
+}
+
+function compressImage(file, maxSide, quality) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxSide || h > maxSide) {
+          if (w > h) { h = Math.round(h * maxSide / w); w = maxSide; }
+          else { w = Math.round(w * maxSide / h); h = maxSide; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(resolve, 'image/jpeg', quality);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function uploadPhoto(input) {
+  const file = input.files[0];
+  if (!file || !photoContext) return;
+  if (!fbStorage) { alert('Storage not available.'); return; }
+  const progress = document.getElementById('photoProgress');
+  const bar = document.getElementById('photoProgressBar');
+  progress.style.display = '';
+  bar.style.width = '5%';
+  compressImage(file, 1400, 0.85).then(blob => {
+    const path = `photos/${photoContext.dayKey}/${Date.now()}.jpg`;
+    const task = fbStorage.ref(path).put(blob, { contentType: 'image/jpeg' });
+    task.on('state_changed',
+      snap => { bar.style.width = (snap.bytesTransferred / snap.totalBytes * 100).toFixed(0) + '%'; },
+      err => { progress.style.display = 'none'; alert('Upload failed: ' + err.message); },
+      () => {
+        task.snapshot.ref.getDownloadURL().then(url => {
+          progress.style.display = 'none';
+          input.value = '';
+          const { dayKey, jobIdx } = photoContext;
+          const data = getDayData(dayKey);
+          const job = data.jobs[jobIdx];
+          if (!job) return;
+          if (!Array.isArray(job.photos)) job.photos = [];
+          job.photos.push({
+            url, path, ts: Date.now(),
+            uploaderUid: currentUser ? currentUser.uid : null,
+            uploaderName: document.getElementById('userName').textContent || 'Unknown'
+          });
+          renderPhotoGrid(job.photos);
+          persistState();
+          renderDay();
+        });
+      }
+    );
+  });
+}
+
+function renderPhotoGrid(photos) {
+  const grid = document.getElementById('photoGrid');
+  if (!photos.length) {
+    grid.innerHTML = '<div class="photo-empty">No photos yet.</div>';
+    return;
+  }
+  grid.innerHTML = photos.map((p, i) => {
+    const canDel = currentRole === 'admin' || (currentUser && p.uploaderUid === currentUser.uid);
+    const timeStr = fmtCommentTime(p.ts || 0);
+    return `<div class="photo-thumb-wrap">
+      <img class="photo-thumb" src="${p.url}" onclick="viewPhoto('${p.url}','${p.uploaderName||''}','${timeStr}')" loading="lazy">
+      <div class="photo-thumb-info">${p.uploaderName||'Unknown'}<br><span style="color:#555">${timeStr}</span></div>
+      ${canDel ? `<button class="photo-del-btn" onclick="deletePhoto(${i})" title="Delete">✕</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function deletePhoto(idx) {
+  if (!confirm('Delete this photo?')) return;
+  if (!photoContext) return;
+  const { dayKey, jobIdx } = photoContext;
+  const data = getDayData(dayKey);
+  const job = data.jobs[jobIdx];
+  if (!job || !job.photos[idx]) return;
+  const p = job.photos[idx];
+  if (fbStorage && p.path) fbStorage.ref(p.path).delete().catch(() => {});
+  job.photos.splice(idx, 1);
+  renderPhotoGrid(job.photos);
+  persistState();
+  renderDay();
+}
+
+function viewPhoto(url, name, time) {
+  document.getElementById('photoViewerImg').src = url;
+  document.getElementById('photoViewerCaption').textContent = `${name}  ·  ${time}`;
+  document.getElementById('photoViewer').style.display = 'flex';
 }
 
 // ---- Service Requests ----
@@ -1251,6 +1413,9 @@ function getDayData(dayKey) {
     if (!Array.isArray(job.comments)) {
       job.comments = (job.comments && typeof job.comments === 'object') ? Object.values(job.comments) : [];
     }
+    if (!Array.isArray(job.photos)) {
+      job.photos = (job.photos && typeof job.photos === 'object') ? Object.values(job.photos) : [];
+    }
   });
   if (typeof entry.holiday !== 'boolean') entry.holiday = false;
   if (typeof entry.holidayLabel !== 'string') entry.holidayLabel = '';
@@ -1355,6 +1520,7 @@ function renderDay() {
 
   data.jobs.forEach((job, idx) => {
     const cmtCount = (job.comments || []).length;
+    const photoCount = (job.photos || []).length;
     const status = job.status || 'pending';
     const statusLabel = STATUS_LABELS[status] || status;
     const canClickStatus = currentRole === 'admin' || currentRole === 'technician';
@@ -1370,6 +1536,7 @@ function renderDay() {
       </div>
       <div class="job-actions">
         <button class="btn-comment" onclick="openComments('${currentDay}',${idx})" title="Comments">💬${cmtCount ? `<span class="comment-badge">${cmtCount}</span>` : ''}</button>
+        <button class="btn-photo" onclick="openPhotos('${currentDay}',${idx})" title="Photos">📷${photoCount ? `<span class="photo-badge">${photoCount}</span>` : ''}</button>
         <button class="btn-edit-job" onclick="editJob(${idx})" title="Edit">✏</button>
         <button class="btn-edit-job" onclick="moveJob(${idx},-1)" title="Move Up">▲</button>
         <button class="btn-edit-job" onclick="moveJob(${idx},1)" title="Move Down">▼</button>
@@ -1608,7 +1775,8 @@ function saveJob() {
     ibAmount: document.getElementById('fInternalBilling').checked ? (parseFloat(document.getElementById('fIBAmount').value) || 0) : 0,
     desc: document.getElementById('fDesc').value.trim(),
     status: existing ? (existing.status || 'pending') : 'pending',
-    comments: existing ? (existing.comments || []) : []
+    comments: existing ? (existing.comments || []) : [],
+    photos: existing ? (existing.photos || []) : []
   };
   if (editingJob !== null) {
     data.jobs[editingJob.jobIdx] = job;
@@ -1938,10 +2106,12 @@ const FB_CONFIG = {
 let fbReady = false;
 let fbRef = null;
 
+let fbStorage = null;
 function initFirebase() {
   try {
     firebase.initializeApp(FB_CONFIG);
     fbRef = firebase.database().ref('schedule');
+    fbStorage = firebase.storage();
     fbReady = true;
   } catch(e) { console.warn('Firebase init failed', e); }
 }
@@ -2206,9 +2376,10 @@ function loadWeek(monKey) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
-    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg'].forEach(id => {
+    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','photoBg'].forEach(id => {
       document.getElementById(id).classList.remove('open');
     });
+    document.getElementById('photoViewer').style.display = 'none';
   }
 });
 
