@@ -1224,10 +1224,9 @@ function updateJobStatus(idx) {
   const cur = job.status || 'pending';
   const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
   job.status = next;
-  if (job.salesmanUid && job.salesmanUid !== (currentUser && currentUser.uid)) {
-    sendTelegramToUser(job.salesmanUid,
-      `🔄 <b>Job Status Updated</b>\n<b>${job.customer || 'Job'}</b>\nStatus: ${STATUS_LABELS[next]}`);
-  }
+  const statusMsg = `🔄 <b>Job Status Updated</b>\n<b>${job.customer || 'Job'}</b>\nStatus: <b>${STATUS_LABELS[next]}</b>`;
+  if (job.salesmanUid) sendTelegramToUser(job.salesmanUid, statusMsg);
+  if (currentRole === 'technician') sendTelegramToAdmins(statusMsg);
   persistState();
   renderDay();
 }
