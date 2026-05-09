@@ -1004,8 +1004,13 @@ function registerUser() {
       return firebase.database().ref('users').once('value').then(snap => {
         const existing = snap.val() || {};
         const isFirst = Object.keys(existing).filter(k => k !== cred.user.uid).length === 0;
+        const role = isFirst ? 'admin' : 'pending';
         return firebase.database().ref('users/' + cred.user.uid).set({
-          name, email, role: isFirst ? 'admin' : 'pending', createdAt: Date.now()
+          name, email, role, createdAt: Date.now()
+        }).then(() => {
+          if (role === 'pending') {
+            sendTelegramToAdmins(`🆕 <b>New User Registration</b>\n👤 ${name}\n📧 ${email}\n⏳ Pending approval — go to Users to assign a role.`);
+          }
         });
       });
     })
