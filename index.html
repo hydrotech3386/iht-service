@@ -1639,7 +1639,7 @@ function applyStateData(data) {
   state.weekStart = getMonday(new Date()); // always open on current week
   if (!state.members) state.members = ['Farid','Heidi','Annas','Akram','Izzudin'];
   if (!state.salesmen) state.salesmen = ['Jack','Kamal','Helmi','Faris','Ali'];
-  else { ['Jack','Kamal','Helmi','Faris','Ali'].forEach(n => { if (!state.salesmen.includes(n)) state.salesmen.push(n); }); }
+  else { ['Jack','Kamal','Helmi','Faris','Ali','Daniel','Lim SW'].forEach(n => { if (!state.salesmen.includes(n)) state.salesmen.push(n); }); }
   if (!state.schedule || typeof state.schedule !== 'object') state.schedule = {};
   if (!state.revNums || typeof state.revNums !== 'object') state.revNums = {};
   migrateTzKeys();
