@@ -678,6 +678,17 @@
       <input type="date" id="srDate">
     </div>
     <div class="form-row">
+      <label>Recommended No. of Technicians</label>
+      <select id="srTechCount" style="background:#0f3460;border:1px solid #333;color:#ccc;padding:8px 10px;border-radius:6px;font-size:14px;width:100%">
+        <option value="">-- Not specified --</option>
+        <option value="1">1 technician</option>
+        <option value="2">2 technicians</option>
+        <option value="3">3 technicians</option>
+        <option value="4">4 technicians</option>
+        <option value="5">5 technicians</option>
+      </select>
+    </div>
+    <div class="form-row">
       <label>Job Description / Issue</label>
       <textarea id="srDesc" placeholder="Describe the service needed…" style="min-height:80px"></textarea>
     </div>
@@ -1103,6 +1114,7 @@ function setupFirebaseListener() {
             r.address   ? `📍 ${r.address}` : null,
             r.preferredDate ? `📅 Preferred: ${r.preferredDate}` : null,
             r.desc      ? `📝 ${r.desc}` : null,
+            r.techCount ? `👷 Recommended: ${r.techCount} technician${r.techCount>1?'s':''}` : null,
             `🙋 By: ${r.salesmanName || r.salesmanEmail || 'Unknown'}`
           ].filter(Boolean).join('\n');
           sendTelegramToAdmins(lines);
@@ -1188,6 +1200,7 @@ function openServiceRequest() {
   document.getElementById('srAddress').value = '';
   document.getElementById('srDate').value = '';
   document.getElementById('srDesc').value = '';
+  document.getElementById('srTechCount').value = '';
   renderReqFileList();
   document.querySelector('#svcReqBg h2').textContent = '📋 New Service Request';
   document.querySelector('#svcReqBg .btn-confirm').textContent = 'Submit Request';
@@ -1206,6 +1219,7 @@ function editRequest(key) {
     document.getElementById('srAddress').value = r.address || '';
     document.getElementById('srDate').value = r.preferredDate || '';
     document.getElementById('srDesc').value = r.desc || '';
+    document.getElementById('srTechCount').value = r.techCount || '';
     renderReqFileList();
     document.querySelector('#svcReqBg h2').textContent = '✏️ Edit Request';
     document.querySelector('#svcReqBg .btn-confirm').textContent = 'Update Request';
@@ -1224,6 +1238,7 @@ function submitServiceRequest() {
     address: document.getElementById('srAddress').value.trim(),
     preferredDate: document.getElementById('srDate').value,
     desc: document.getElementById('srDesc').value.trim(),
+    techCount: document.getElementById('srTechCount').value || null,
     files: currentReqFiles.length ? currentReqFiles : null
   };
   if (editingReqKey) {
@@ -1317,6 +1332,7 @@ function loadRequests() {
           <div class="req-customer">${r.customer}${schedHtml}</div>
           <div style="margin:3px 0">${r.contact?`<span class="req-detail">📞 ${r.contact}</span>`:''}${r.address?`<span class="req-detail">📍 ${r.address}</span>`:''}</div>
           ${r.desc?`<div class="req-desc">${r.desc}</div>`:''}
+          ${r.techCount ? `<div style="font-size:11px;color:#6c5ce7;margin:2px 0">👷 Recommended: ${r.techCount} technician${r.techCount>1?'s':''}</div>` : ''}
           <div class="req-meta">${prefHtml}By ${r.salesmanName||r.salesmanEmail||'?'} · ${dateStr}</div>
         </div>
         <div class="req-actions">${adminActions}${editBtn}${photoBtn}${reqFilesBtn}${delBtn}</div>`;
