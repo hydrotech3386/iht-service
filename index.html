@@ -804,6 +804,7 @@ const VIEW_ONLY = new URLSearchParams(window.location.search).has('view');
 // ---- Auth & Roles ----
 let currentUser = null;
 let currentRole = 'view-only';
+let currentScheduleName = '';
 const STATUS_CYCLE = ['pending','in-progress','completed','cancelled'];
 const STATUS_LABELS = {'pending':'Pending','in-progress':'In Progress','completed':'Completed','cancelled':'Cancelled'};
 
@@ -1259,7 +1260,7 @@ function submitServiceRequest() {
     // New request
     const req = {
       ...fields,
-      salesmanName: document.getElementById('userName').textContent || '',
+      salesmanName: currentScheduleName || document.getElementById('userName').textContent || '',
       salesmanEmail: currentUser ? (currentUser.email || '') : '',
       submittedByUid: currentUser ? currentUser.uid : null,
       status: 'new',
@@ -1478,6 +1479,12 @@ function renderUsersList() {
         <div style="flex:1;min-width:0">
           <div class="user-row-name">${u.name || 'Unknown'}${isSelf ? ' <span style="font-size:10px;color:#aaa">(you)</span>' : ''}</div>
           <div class="user-row-email">${u.email || uid}</div>
+          <div style="margin-top:4px;display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;color:#555;white-space:nowrap">Schedule name:</span>
+            <input type="text" value="${u.scheduleName||''}" placeholder="e.g. Jack"
+              onchange="setUserScheduleName('${uid}',this.value)"
+              style="background:#0f3460;border:1px solid #333;color:#ccc;padding:3px 7px;border-radius:4px;font-size:12px;width:100px">
+          </div>
         </div>
         <select class="user-row-role" onchange="setUserRole('${uid}',this.value)">${roleOpts}</select>
         ${isSelf ? '' : `<button onclick="deleteUser('${uid}','${(u.name||'this user').replace(/'/g,"\\'")}','${u.role||''}')" title="Remove user" style="background:#e94560;border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`}`;
@@ -1491,6 +1498,15 @@ function renderUsersList() {
 function setUserRole(uid, role) {
   firebase.database().ref('users/' + uid + '/role').set(role)
     .catch(e => alert('Failed to update role: ' + e.message));
+}
+
+function setUserScheduleName(uid, name) {
+  const val = name.trim();
+  firebase.database().ref('users/' + uid + '/scheduleName').set(val || null)
+    .then(() => {
+      if (currentUser && uid === currentUser.uid) currentScheduleName = val;
+    })
+    .catch(e => alert('Failed to update schedule name: ' + e.message));
 }
 
 function deleteUser(uid, name, role) {
@@ -1666,6 +1682,7 @@ function init() {
       fetchUserData(user.uid).then(userData => {
         const role = userData.role || 'pending';
         const name = userData.name || user.email;
+        currentScheduleName = userData.scheduleName || '';
         if (role === 'pending') {
           applyRole('view-only');
           document.getElementById('loginCard').style.display = 'none';
@@ -2373,7 +2390,8 @@ function isOwnIBJob(job) {
   if (!job.internalBilling) return false;
   if (currentRole === 'admin') return true;
   if (job.salesmanUid && currentUser) return job.salesmanUid === currentUser.uid;
-  return job.salesman === document.getElementById('userName').textContent;
+  const myName = currentScheduleName || document.getElementById('userName').textContent;
+  return job.salesman === myName;
 }
 
 function openSummary() {
