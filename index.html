@@ -1459,11 +1459,7 @@ function openManageUsers() {
 }
 
 function getKnownSalesmanNames() {
-  const names = new Set();
-  Object.values(state.days || {}).forEach(day => {
-    (day.jobs || []).forEach(job => { if (job.salesman) names.add(job.salesman); });
-  });
-  return [...names].sort();
+  return [...(state.salesmen || [])].sort();
 }
 
 function populateSchedSelect(sel, row, role, currentVal) {
