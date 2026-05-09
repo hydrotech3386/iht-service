@@ -1458,6 +1458,24 @@ function openManageUsers() {
   renderUsersList();
 }
 
+function getKnownSalesmanNames() {
+  const names = new Set();
+  Object.values(state.days || {}).forEach(day => {
+    (day.jobs || []).forEach(job => { if (job.salesman) names.add(job.salesman); });
+  });
+  return [...names].sort();
+}
+
+function populateSchedSelect(sel, row, role, currentVal) {
+  let names = [];
+  if (role === 'salesman') names = getKnownSalesmanNames();
+  else if (role === 'technician') names = [...(state.members || [])].sort();
+  if (!names.length) { row.style.display = 'none'; return; }
+  row.style.display = 'flex';
+  sel.innerHTML = '<option value="">-- Select name --</option>' +
+    names.map(n => `<option value="${n}" ${n === currentVal ? 'selected' : ''}>${n}</option>`).join('');
+}
+
 function renderUsersList() {
   const list = document.getElementById('usersList');
   list.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:20px">Loading...</div>';
@@ -1479,15 +1497,23 @@ function renderUsersList() {
         <div style="flex:1;min-width:0">
           <div class="user-row-name">${u.name || 'Unknown'}${isSelf ? ' <span style="font-size:10px;color:#aaa">(you)</span>' : ''}</div>
           <div class="user-row-email">${u.email || uid}</div>
-          <div style="margin-top:4px;display:flex;align-items:center;gap:6px">
+          <div class="sched-name-row" style="margin-top:4px;align-items:center;gap:6px;display:none">
             <span style="font-size:11px;color:#555;white-space:nowrap">Schedule name:</span>
-            <input type="text" value="${u.scheduleName||''}" placeholder="e.g. Jack"
-              onchange="setUserScheduleName('${uid}',this.value)"
-              style="background:#0f3460;border:1px solid #333;color:#ccc;padding:3px 7px;border-radius:4px;font-size:12px;width:100px">
+            <select class="sched-name-sel" style="background:#0f3460;border:1px solid #333;color:#ccc;padding:3px 7px;border-radius:4px;font-size:12px"></select>
           </div>
         </div>
-        <select class="user-row-role" onchange="setUserRole('${uid}',this.value)">${roleOpts}</select>
+        <select class="user-row-role">${roleOpts}</select>
         ${isSelf ? '' : `<button onclick="deleteUser('${uid}','${(u.name||'this user').replace(/'/g,"\\'")}','${u.role||''}')" title="Remove user" style="background:#e94560;border:none;color:#fff;width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`}`;
+      const roleSelect = row.querySelector('.user-row-role');
+      const schedRow  = row.querySelector('.sched-name-row');
+      const schedSel  = row.querySelector('.sched-name-sel');
+      populateSchedSelect(schedSel, schedRow, u.role, u.scheduleName || '');
+      roleSelect.addEventListener('change', () => {
+        setUserRole(uid, roleSelect.value);
+        setUserScheduleName(uid, '');
+        populateSchedSelect(schedSel, schedRow, roleSelect.value, '');
+      });
+      schedSel.addEventListener('change', () => setUserScheduleName(uid, schedSel.value));
       list.appendChild(row);
     });
   }).catch(() => {
