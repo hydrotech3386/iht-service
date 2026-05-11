@@ -672,6 +672,21 @@
   <div class="lightbox-caption" id="lightboxCaption"></div>
 </div>
 
+<!-- IB Comment Modal -->
+<div class="modal-bg" id="ibCommentBg">
+  <div class="modal" style="max-width:420px">
+    <h2>💬 IB Comment</h2>
+    <div class="form-row">
+      <label id="ibCommentJobLabel" style="font-size:13px;color:#ccc;margin-bottom:8px;display:block"></label>
+      <textarea id="ibCommentText" placeholder="Enter your comment or dispute…" style="width:100%;background:#0f3460;border:1px solid #333;color:#fff;border-radius:6px;padding:8px 10px;font-size:13px;resize:vertical;min-height:80px;font-family:inherit"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('ibCommentBg').classList.remove('open')">Cancel</button>
+      <button class="btn-confirm" onclick="submitIBComment()">Save Comment</button>
+    </div>
+  </div>
+</div>
+
 <!-- Monthly Summary Modal -->
 <div class="modal-bg" id="summaryBg">
   <div class="modal" style="max-width:680px">
@@ -2545,10 +2560,11 @@ function renderSummary() {
   Object.keys(state.schedule).forEach(dateKey => {
     if (!dateKey.startsWith(month)) return;
     const day = getDayData(dateKey);
-    (day.jobs || []).filter(j => isOwnIBJob(j)).forEach(job => {
+    (day.jobs || []).forEach((job, jobIdx) => {
+      if (!isOwnIBJob(job)) return;
       const key = job.salesman || '(No salesman)';
       if (!bySalesman[key]) bySalesman[key] = [];
-      bySalesman[key].push({ date: dateKey, customer: job.customer, contact: job.contact, address: job.address, desc: job.desc, team: job.team, status: job.status, amount: job.ibAmount || 0 });
+      bySalesman[key].push({ date: dateKey, jobIdx, customer: job.customer, contact: job.contact, address: job.address, desc: job.desc, team: job.team, status: job.status, amount: job.ibAmount || 0, ibAccepted: job.ibAccepted || false, ibAcceptedAt: job.ibAcceptedAt || null, ibSalesmanComment: job.ibSalesmanComment || '' });
     });
   });
 
@@ -2562,37 +2578,77 @@ function renderSummary() {
   let rows = '';
 
   if (currentRole === 'salesman') {
-    // Salesman view: flat list of own jobs, no salesman column
+    // Salesman view: flat list of own jobs with Accept/Comment actions
     const myJobs = Object.values(bySalesman).flat();
     myJobs.sort((a, b) => a.date.localeCompare(b.date));
     const total = myJobs.reduce((s, j) => s + j.amount, 0);
     grandTotal = total;
-    rows = myJobs.map(j => {
+    const tableEl = document.createElement('table');
+    tableEl.className = 'summary-table';
+    tableEl.innerHTML = '<thead><tr><th>Date</th><th>Job</th><th style="text-align:right">Amount</th><th style="text-align:center">Action</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    myJobs.forEach(j => {
       const d = new Date(j.date);
       const statusColors = { pending:'#666', 'in-progress':'#f39c12', completed:'#27ae60', cancelled:'#e94560' };
       const statusColor = statusColors[j.status] || '#666';
-      return `<tr>
-        <td style="color:#aaa;white-space:nowrap;vertical-align:top">${d.getDate()}/${d.getMonth()+1}</td>
-        <td style="color:#ccc;vertical-align:top">
-          <div style="font-weight:600">${j.customer || '—'}</div>
-          ${j.contact ? `<div style="font-size:11px;color:#aaa">📞 ${j.contact}</div>` : ''}
-          ${j.address ? `<div style="font-size:11px;color:#aaa">📍 ${j.address}</div>` : ''}
-          ${j.team ? `<div style="font-size:11px;color:#aaa">👷 ${j.team}</div>` : ''}
-          ${j.desc ? `<div style="font-size:11px;color:#888;margin-top:2px">${j.desc}</div>` : ''}
-          ${j.status ? `<div style="font-size:10px;color:${statusColor};margin-top:2px;text-transform:uppercase;font-weight:600">${j.status}</div>` : ''}
-        </td>
-        <td style="text-align:right;color:#f39c12;font-weight:600;white-space:nowrap;vertical-align:top">${j.amount > 0 ? 'RM '+j.amount.toLocaleString('en',{minimumFractionDigits:2}) : '—'}</td>
-      </tr>`;
-    }).join('');
-    content.innerHTML = `
-      <table class="summary-table">
-        <thead><tr><th>Date</th><th>Job</th><th style="text-align:right">Amount</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 16px;background:#0f3460;border-radius:8px;border:2px solid #f39c12">
-        <span style="font-weight:700;color:#f39c12;font-size:14px">TOTAL (${myJobs.length} job${myJobs.length!==1?'s':''})</span>
-        <span style="font-weight:700;color:#f39c12;font-size:16px">RM ${total.toLocaleString('en',{minimumFractionDigits:2})}</span>
-      </div>`;
+      const tr = document.createElement('tr');
+
+      // Date cell
+      const tdDate = document.createElement('td');
+      tdDate.style.cssText = 'color:#aaa;white-space:nowrap;vertical-align:top';
+      tdDate.textContent = `${d.getDate()}/${d.getMonth()+1}`;
+      tr.appendChild(tdDate);
+
+      // Job detail cell
+      const tdJob = document.createElement('td');
+      tdJob.style.cssText = 'color:#ccc;vertical-align:top';
+      tdJob.innerHTML = `<div style="font-weight:600">${j.customer || '—'}</div>` +
+        (j.contact ? `<div style="font-size:11px;color:#aaa">📞 ${j.contact}</div>` : '') +
+        (j.address ? `<div style="font-size:11px;color:#aaa">📍 ${j.address}</div>` : '') +
+        (j.team ? `<div style="font-size:11px;color:#aaa">👷 ${j.team}</div>` : '') +
+        (j.desc ? `<div style="font-size:11px;color:#888;margin-top:2px">${j.desc}</div>` : '') +
+        (j.status ? `<div style="font-size:10px;color:${statusColor};margin-top:2px;text-transform:uppercase;font-weight:600">${j.status}</div>` : '') +
+        (j.ibSalesmanComment ? `<div style="font-size:11px;color:#6c5ce7;margin-top:3px;font-style:italic">💬 ${j.ibSalesmanComment}</div>` : '');
+      tr.appendChild(tdJob);
+
+      // Amount cell
+      const tdAmt = document.createElement('td');
+      tdAmt.style.cssText = 'text-align:right;color:#f39c12;font-weight:600;white-space:nowrap;vertical-align:top';
+      tdAmt.textContent = j.amount > 0 ? 'RM ' + j.amount.toLocaleString('en', {minimumFractionDigits:2}) : '—';
+      tr.appendChild(tdAmt);
+
+      // Action cell
+      const tdAct = document.createElement('td');
+      tdAct.style.cssText = 'text-align:center;vertical-align:top;white-space:nowrap';
+      if (j.ibAccepted) {
+        const badge = document.createElement('div');
+        badge.style.cssText = 'color:#27ae60;font-size:11px;font-weight:700';
+        const acceptedDate = j.ibAcceptedAt ? new Date(j.ibAcceptedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
+        badge.textContent = `✓ Accepted${acceptedDate ? ' ' + acceptedDate : ''}`;
+        tdAct.appendChild(badge);
+      } else {
+        const acceptBtn = document.createElement('button');
+        acceptBtn.style.cssText = 'background:#1a4a2e;border:1px solid #27ae60;color:#27ae60;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;margin-bottom:4px;display:block;width:100%';
+        acceptBtn.textContent = '✓ Accept';
+        acceptBtn.onclick = () => acceptIBJob(j.date, j.jobIdx);
+        tdAct.appendChild(acceptBtn);
+      }
+      const commentBtn = document.createElement('button');
+      commentBtn.style.cssText = 'background:#2a1a4a;border:1px solid #6c5ce7;color:#a29bfe;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:block;width:100%;margin-top:2px';
+      commentBtn.textContent = j.ibSalesmanComment ? '💬 Edit' : '💬 Comment';
+      commentBtn.onclick = () => openIBComment(j.date, j.jobIdx, j.customer, j.ibSalesmanComment);
+      tdAct.appendChild(commentBtn);
+      tr.appendChild(tdAct);
+
+      tbody.appendChild(tr);
+    });
+    tableEl.appendChild(tbody);
+    const totalDiv = document.createElement('div');
+    totalDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 16px;background:#0f3460;border-radius:8px;border:2px solid #f39c12';
+    totalDiv.innerHTML = `<span style="font-weight:700;color:#f39c12;font-size:14px">TOTAL (${myJobs.length} job${myJobs.length!==1?'s':''})</span><span style="font-weight:700;color:#f39c12;font-size:16px">RM ${total.toLocaleString('en',{minimumFractionDigits:2})}</span>`;
+    content.innerHTML = '';
+    content.appendChild(tableEl);
+    content.appendChild(totalDiv);
     return;
   }
 
@@ -2623,6 +2679,69 @@ function renderSummary() {
       <span style="font-weight:700;color:#f39c12;font-size:14px">GRAND TOTAL (${totalCount} jobs)</span>
       <span style="font-weight:700;color:#f39c12;font-size:16px">RM ${grandTotal.toLocaleString('en',{minimumFractionDigits:2})}</span>
     </div>`;
+}
+
+// ---- IB Accept / Comment ----
+let ibCommentContext = null; // { dateKey, jobIdx }
+
+function acceptIBJob(dateKey, jobIdx) {
+  if (!confirm('Mark this job as accepted?')) return;
+  const day = getDayData(dateKey);
+  if (!day.jobs[jobIdx]) return;
+  day.jobs[jobIdx].ibAccepted = true;
+  day.jobs[jobIdx].ibAcceptedAt = Date.now();
+  day.jobs[jobIdx].ibAcceptedBy = currentUser ? currentUser.uid : '';
+  persistState();
+  // Notify admins
+  const job = day.jobs[jobIdx];
+  const myName = currentScheduleName || (document.getElementById('userName') ? document.getElementById('userName').textContent : '');
+  const d = new Date(dateKey);
+  const dateStr = d.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+  const lines = [
+    `✅ IB Job Accepted`,
+    `Salesman: ${myName}`,
+    `Date: ${dateStr}`,
+    `Customer: ${job.customer || '—'}`,
+    `Amount: ${job.ibAmount > 0 ? 'RM ' + (job.ibAmount).toLocaleString('en',{minimumFractionDigits:2}) : '—'}`
+  ].filter(Boolean).join('\n');
+  sendTelegramToAdmins(lines);
+  renderSummary();
+}
+
+function openIBComment(dateKey, jobIdx, customer, existing) {
+  ibCommentContext = { dateKey, jobIdx };
+  document.getElementById('ibCommentJobLabel').textContent = customer || 'Job';
+  document.getElementById('ibCommentText').value = existing || '';
+  document.getElementById('ibCommentBg').classList.add('open');
+  setTimeout(() => document.getElementById('ibCommentText').focus(), 100);
+}
+
+function submitIBComment() {
+  if (!ibCommentContext) return;
+  const { dateKey, jobIdx } = ibCommentContext;
+  const text = document.getElementById('ibCommentText').value.trim();
+  const day = getDayData(dateKey);
+  if (!day.jobs[jobIdx]) return;
+  day.jobs[jobIdx].ibSalesmanComment = text;
+  persistState();
+  // Notify admins
+  const job = day.jobs[jobIdx];
+  const myName = currentScheduleName || (document.getElementById('userName') ? document.getElementById('userName').textContent : '');
+  const d = new Date(dateKey);
+  const dateStr = d.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
+  if (text) {
+    const lines = [
+      `💬 IB Job Comment`,
+      `Salesman: ${myName}`,
+      `Date: ${dateStr}`,
+      `Customer: ${job.customer || '—'}`,
+      `Comment: ${text}`
+    ].filter(Boolean).join('\n');
+    sendTelegramToAdmins(lines);
+  }
+  document.getElementById('ibCommentBg').classList.remove('open');
+  ibCommentContext = null;
+  renderSummary();
 }
 
 // ---- Photos ----
@@ -3383,7 +3502,7 @@ function loadWeek(monKey) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
-    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg','jobChangeBg'].forEach(id => {
+    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg','jobChangeBg','ibCommentBg'].forEach(id => {
       document.getElementById(id).classList.remove('open');
     });
   }
