@@ -1126,6 +1126,8 @@ function startEditName() {
 
 function setupFirebaseListener() {
   setSyncStatus('syncing');
+  // Clean up any existing request listener before re-attaching
+  if (fbReqRef) { fbReqRef.off(); fbReqRef = null; }
   // Live request badge for admin
   if (currentRole === 'admin') {
     fbReqRef = firebase.database().ref('requests');
