@@ -1170,7 +1170,7 @@ function setupFirebaseListener() {
         const r = child.val();
         if (r.status === 'new') {
           count++;
-          if (!isFirstReqSnap && !seenReqKeys.has(child.key)) incoming.push(r);
+          if (!isFirstReqSnap && !seenReqKeys.has(child.key)) incoming.push({ ...r, _key: child.key });
           seenReqKeys.add(child.key);
         }
       });
@@ -1180,17 +1180,24 @@ function setupFirebaseListener() {
       if (isFirstReqSnap) { isFirstReqSnap = false; }
       else {
         incoming.forEach(r => {
-          const lines = [
-            `📋 <b>New Service Request</b>`,
-            `👤 <b>${r.customer}</b>`,
-            r.contact   ? `📞 ${r.contact}` : null,
-            r.address   ? `📍 ${r.address}` : null,
-            r.preferredDate ? `📅 Preferred: ${r.preferredDate}` : null,
-            r.desc      ? `📝 ${r.desc}` : null,
-            r.techCount ? `👷 Recommended: ${r.techCount} technician${r.techCount>1?'s':''}` : null,
-            `🙋 By: ${r.salesmanName || r.salesmanEmail || 'Unknown'}`
-          ].filter(Boolean).join('\n');
-          sendTelegramToAdmins(lines);
+          // Transaction ensures only one browser tab sends the notification
+          firebase.database().ref('requests/' + r._key + '/notifiedAt').transaction(cur => {
+            if (cur !== null) return; // already sent — abort
+            return Date.now();
+          }).then(result => {
+            if (!result.committed) return;
+            const lines = [
+              `📋 <b>New Service Request</b>`,
+              `👤 <b>${r.customer}</b>`,
+              r.contact   ? `📞 ${r.contact}` : null,
+              r.address   ? `📍 ${r.address}` : null,
+              r.preferredDate ? `📅 Preferred: ${r.preferredDate}` : null,
+              r.desc      ? `📝 ${r.desc}` : null,
+              r.techCount ? `👷 Recommended: ${r.techCount} technician${r.techCount>1?'s':''}` : null,
+              `🙋 By: ${r.salesmanName || r.salesmanEmail || 'Unknown'}`
+            ].filter(Boolean).join('\n');
+            sendTelegramToAdmins(lines);
+          }).catch(() => {});
         });
       }
     });
