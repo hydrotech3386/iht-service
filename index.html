@@ -309,6 +309,7 @@
   .photo-upload-btn:hover{background:#1a3a5c}
   .photo-badge{position:absolute;top:-5px;right:-5px;background:#27ae60;color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
   .btn-photo{background:#1a4a3a!important;border:1px solid #27ae60!important;color:#5dfc8d!important;position:relative}
+  .btn-job-change{background:#4a3000!important;border:1px solid #f39c12!important;color:#f39c12!important}
   .btn-photo:hover{background:#27ae60!important;color:#fff!important}
   /* Lightbox */
   .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;flex-direction:column}
@@ -1974,7 +1975,7 @@ function renderDay() {
         (!job.salesmanUid && job.salesman && job.salesman === (currentScheduleName || document.getElementById('userName').textContent));
       if (isOwn) {
         const reqBtn = document.createElement('button');
-        reqBtn.className = 'btn-edit-job';
+        reqBtn.className = 'btn-job-change';
         reqBtn.title = 'Request date change or cancellation';
         reqBtn.textContent = '🔄';
         reqBtn.onclick = () => openJobChangeRequest(currentDay, idx);
