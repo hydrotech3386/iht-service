@@ -486,7 +486,7 @@
   <button class="btn-request" onclick="openServiceRequest()">📋 New Request</button>
   <button class="btn-requests" id="btnRequests" onclick="openRequestsPanel()">📬 Requests<span class="req-count" id="reqCount" style="display:none">0</span></button>
   <button class="btn-copy" onclick="showWAPreview()">📋 Copy for WhatsApp</button>
-  <button class="btn-summary" onclick="openSummary()">📊 Internal Billing</button>
+  <button class="btn-summary" id="btnSummary" onclick="openSummary()" style="position:relative">📊 Internal Billing<span class="req-count" id="ibPendingCount" style="display:none">0</span></button>
   <button class="btn-load" onclick="toggleHistory()">📁 History</button>
   <button class="btn-del-week" onclick="deleteWeek()">🗑 Delete Week</button>
   <button class="btn-backup" onclick="exportBackup()">⬇ Backup</button>
@@ -691,8 +691,9 @@
 <div class="modal-bg" id="summaryBg">
   <div class="modal" style="max-width:680px">
     <h2>📊 Internal Billing</h2>
-    <div class="month-selector">
+    <div class="month-selector" style="flex-wrap:wrap;gap:8px">
       <select id="summaryMonth" onchange="renderSummary()"></select>
+      <button id="ibPendingFilterBtn" onclick="toggleIBPendingFilter()" style="background:#1a3a1a;border:1px solid #27ae60;color:#27ae60;border-radius:6px;padding:5px 12px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap">⏳ Pending only</button>
     </div>
     <div id="summaryContent"></div>
     <div class="modal-actions">
@@ -1858,6 +1859,28 @@ function render() {
   document.getElementById('revNum').value = state.revNums[weekKey(ws)] || 0;
 
   try { renderDay(); } catch(e) { console.error('renderDay error:', e); }
+  updateIBPendingBadge();
+}
+
+function updateIBPendingBadge() {
+  const badge = document.getElementById('ibPendingCount');
+  if (!badge) return;
+  let count = 0;
+  Object.values(state.schedule || {}).forEach(day => {
+    (day.jobs || []).forEach(job => {
+      if (!job.internalBilling) return;
+      if (job.status !== 'completed') return;
+      if (job.ibAccepted) return;
+      // Admin sees Office jobs; salesmen see their own jobs
+      if (currentRole === 'admin' && job.salesman === 'Office') count++;
+      else if (currentRole === 'salesman') {
+        const myName = currentScheduleName || (document.getElementById('userName') ? document.getElementById('userName').textContent : '');
+        if (job.salesman === myName || (job.salesmanUid && currentUser && job.salesmanUid === currentUser.uid)) count++;
+      }
+    });
+  });
+  badge.textContent = count;
+  badge.style.display = count > 0 ? 'flex' : 'none';
 }
 
 function setAbsence(name, type) {
@@ -2513,7 +2536,27 @@ function isOwnIBJob(job) {
   return job.salesman === myName;
 }
 
+let ibPendingFilter = false;
+
+function toggleIBPendingFilter() {
+  ibPendingFilter = !ibPendingFilter;
+  const btn = document.getElementById('ibPendingFilterBtn');
+  if (ibPendingFilter) {
+    btn.style.background = '#27ae60';
+    btn.style.color = '#fff';
+    btn.style.borderColor = '#27ae60';
+  } else {
+    btn.style.background = '#1a3a1a';
+    btn.style.color = '#27ae60';
+    btn.style.borderColor = '#27ae60';
+  }
+  renderSummary();
+}
+
 function openSummary() {
+  ibPendingFilter = false;
+  const btn = document.getElementById('ibPendingFilterBtn');
+  if (btn) { btn.style.background='#1a3a1a'; btn.style.color='#27ae60'; btn.style.borderColor='#27ae60'; }
   const sel = document.getElementById('summaryMonth');
   sel.innerHTML = '';
   document.querySelector('#summaryBg h2').textContent = currentRole === 'salesman' ? '📊 My Billing Summary' : '📊 Internal Billing';
@@ -2551,6 +2594,7 @@ function renderSummary() {
     const day = getDayData(dateKey);
     (day.jobs || []).forEach((job, jobIdx) => {
       if (!isOwnIBJob(job)) return;
+      if (ibPendingFilter && (job.status !== 'completed' || job.ibAccepted)) return;
       const key = job.salesman || '(No salesman)';
       if (!bySalesman[key]) bySalesman[key] = [];
       bySalesman[key].push({ date: dateKey, jobIdx, customer: job.customer, contact: job.contact, address: job.address, desc: job.desc, team: job.team, status: job.status, amount: job.ibAmount || 0, ibAccepted: job.ibAccepted || false, ibAcceptedAt: job.ibAcceptedAt || null, ibSalesmanComment: job.ibSalesmanComment || '' });
@@ -2559,7 +2603,7 @@ function renderSummary() {
 
   const salesmen = Object.keys(bySalesman).sort();
   if (salesmen.length === 0) {
-    content.innerHTML = '<div class="summary-empty">No internal billing jobs for this month.</div>';
+    content.innerHTML = `<div class="summary-empty">${ibPendingFilter ? 'No pending acceptance jobs this month. 🎉' : 'No internal billing jobs for this month.'}</div>`;
     return;
   }
 
@@ -3270,6 +3314,7 @@ function persistState() {
       .then(() => setSyncStatus('synced'))
       .catch(() => setSyncStatus('offline'));
   }
+  updateIBPendingBadge();
 }
 
 // ---- PDF Export ----
