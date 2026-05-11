@@ -2548,7 +2548,7 @@ function renderSummary() {
     (day.jobs || []).filter(j => isOwnIBJob(j)).forEach(job => {
       const key = job.salesman || '(No salesman)';
       if (!bySalesman[key]) bySalesman[key] = [];
-      bySalesman[key].push({ date: dateKey, customer: job.customer, desc: job.desc, amount: job.ibAmount || 0 });
+      bySalesman[key].push({ date: dateKey, customer: job.customer, contact: job.contact, address: job.address, desc: job.desc, team: job.team, status: job.status, amount: job.ibAmount || 0 });
     });
   });
 
@@ -2569,10 +2569,19 @@ function renderSummary() {
     grandTotal = total;
     rows = myJobs.map(j => {
       const d = new Date(j.date);
+      const statusColors = { pending:'#666', 'in-progress':'#f39c12', completed:'#27ae60', cancelled:'#e94560' };
+      const statusColor = statusColors[j.status] || '#666';
       return `<tr>
-        <td style="color:#aaa;white-space:nowrap">${d.getDate()}/${d.getMonth()+1}</td>
-        <td style="color:#ccc">${j.customer || '—'}${j.desc ? `<div style="font-size:11px;color:#666;margin-top:2px">${j.desc}</div>` : ''}</td>
-        <td style="text-align:right;color:#f39c12;font-weight:600;white-space:nowrap">${j.amount > 0 ? 'RM '+j.amount.toLocaleString('en',{minimumFractionDigits:2}) : '—'}</td>
+        <td style="color:#aaa;white-space:nowrap;vertical-align:top">${d.getDate()}/${d.getMonth()+1}</td>
+        <td style="color:#ccc;vertical-align:top">
+          <div style="font-weight:600">${j.customer || '—'}</div>
+          ${j.contact ? `<div style="font-size:11px;color:#aaa">📞 ${j.contact}</div>` : ''}
+          ${j.address ? `<div style="font-size:11px;color:#aaa">📍 ${j.address}</div>` : ''}
+          ${j.team ? `<div style="font-size:11px;color:#aaa">👷 ${j.team}</div>` : ''}
+          ${j.desc ? `<div style="font-size:11px;color:#888;margin-top:2px">${j.desc}</div>` : ''}
+          ${j.status ? `<div style="font-size:10px;color:${statusColor};margin-top:2px;text-transform:uppercase;font-weight:600">${j.status}</div>` : ''}
+        </td>
+        <td style="text-align:right;color:#f39c12;font-weight:600;white-space:nowrap;vertical-align:top">${j.amount > 0 ? 'RM '+j.amount.toLocaleString('en',{minimumFractionDigits:2}) : '—'}</td>
       </tr>`;
     }).join('');
     content.innerHTML = `
@@ -2594,11 +2603,11 @@ function renderSummary() {
     grandTotal += total;
     const jobList = jobs.map(j => {
       const d = new Date(j.date);
-      return `<div class="job-item">${j.customer || '—'}${j.desc ? ' — '+j.desc : ''}<span class="job-date">(${d.getDate()}/${d.getMonth()+1})</span></div>`;
+      return `<div class="job-item">${d.getDate()}/${d.getMonth()+1} — ${j.customer || '—'}${j.address ? ' · '+j.address : ''}${j.desc ? ' <span style="color:#666">'+j.desc+'</span>' : ''}</div>`;
     }).join('');
     return `<tr>
-      <td class="salesman-name">${sm}<div style="font-weight:400;margin-top:4px">${jobList}</div></td>
-      <td>${jobList}</td>
+      <td class="salesman-name">${sm}</td>
+      <td><div style="font-weight:400">${jobList}</div></td>
       <td style="text-align:right;white-space:nowrap;color:#f39c12;font-weight:600">${total > 0 ? 'RM '+total.toLocaleString('en',{minimumFractionDigits:2}) : '—'}</td>
       <td style="text-align:center;color:#aaa">${jobs.length}</td>
     </tr>`;
