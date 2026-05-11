@@ -858,8 +858,6 @@ const STATUS_LABELS = {'pending':'Pending','in-progress':'In Progress','complete
 // ---- Notifications ----
 const TG_TOKEN = '8371008663:AAFZVlpuQ9PAsYu1nTOUDBVr9lvAWLrnHQw';
 
-let seenReqKeys = new Set();
-let isFirstReqSnap = true;
 let prevCommentCounts = {};
 let isFirstSchedSnap = true;
 
@@ -1180,41 +1178,10 @@ function setupFirebaseListener() {
     fbReqRef = firebase.database().ref('requests');
     fbReqRef.on('value', snap => {
       let count = 0;
-      const incoming = [];
-      snap.forEach(child => {
-        const r = child.val();
-        if (r.status === 'new') {
-          count++;
-          if (!isFirstReqSnap && !seenReqKeys.has(child.key)) incoming.push({ ...r, _key: child.key });
-          seenReqKeys.add(child.key);
-        }
-      });
+      snap.forEach(child => { if (child.val().status === 'new') count++; });
       const badge = document.getElementById('reqCount');
       badge.textContent = count;
       badge.style.display = count > 0 ? 'flex' : 'none';
-      if (isFirstReqSnap) { isFirstReqSnap = false; }
-      else {
-        incoming.forEach(r => {
-          // Transaction ensures only one browser tab sends the notification
-          firebase.database().ref('requests/' + r._key + '/notifiedAt').transaction(cur => {
-            if (cur !== null) return; // already sent — abort
-            return Date.now();
-          }).then(result => {
-            if (!result.committed) return;
-            const lines = [
-              `📋 <b>New Service Request</b>`,
-              `👤 <b>${r.customer}</b>`,
-              r.contact   ? `📞 ${r.contact}` : null,
-              r.address   ? `📍 ${r.address}` : null,
-              r.preferredDate ? `📅 Preferred: ${r.preferredDate}` : null,
-              r.desc      ? `📝 ${r.desc}` : null,
-              r.techCount ? `👷 Recommended: ${r.techCount} technician${r.techCount>1?'s':''}` : null,
-              `🙋 By: ${r.salesmanName || r.salesmanEmail || 'Unknown'}`
-            ].filter(Boolean).join('\n');
-            sendTelegramToAdmins(lines);
-          }).catch(() => {});
-        });
-      }
     });
   }
   // Live badge for salesman — their own pending requests
@@ -1362,6 +1329,17 @@ function submitServiceRequest() {
     };
     firebase.database().ref('requests').push(req)
       .then(() => {
+        const lines = [
+          `📋 <b>New Service Request</b>`,
+          `👤 <b>${req.customer}</b>`,
+          req.contact ? `📞 ${req.contact}` : null,
+          req.address ? `📍 ${req.address}` : null,
+          req.preferredDate ? `📅 Preferred: ${req.preferredDate}` : null,
+          req.desc ? `📝 ${req.desc}` : null,
+          req.techCount ? `👷 Recommended: ${req.techCount} technician${req.techCount>1?'s':''}` : null,
+          `🙋 By: ${req.salesmanName || req.salesmanEmail || 'Unknown'}`
+        ].filter(Boolean).join('\n');
+        sendTelegramToAdmins(lines);
         document.getElementById('svcReqBg').classList.remove('open');
         alert('Request submitted! Admin will assign it to the schedule.');
       })
