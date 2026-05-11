@@ -605,6 +605,37 @@
 </div>
 
 <!-- Photo Panel -->
+<!-- Job Change Request Modal -->
+<div class="modal-bg" id="jobChangeBg">
+  <div class="modal" style="max-width:420px">
+    <h2>📋 Request Job Change</h2>
+    <div id="jobChangeInfo" style="color:#aaa;font-size:13px;margin-bottom:12px;line-height:1.6"></div>
+    <div class="form-row">
+      <label>Request Type</label>
+      <div style="display:flex;gap:20px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#ccc;font-size:13px">
+          <input type="radio" name="jobChangeType" value="reschedule" checked onchange="toggleJobChangeDateRow('reschedule')"> Change Date
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:#ccc;font-size:13px">
+          <input type="radio" name="jobChangeType" value="cancel" onchange="toggleJobChangeDateRow('cancel')"> Cancel Job
+        </label>
+      </div>
+    </div>
+    <div class="form-row" id="jobChangeDateRow">
+      <label>Preferred New Date</label>
+      <input type="date" id="jobChangeDate">
+    </div>
+    <div class="form-row">
+      <label>Reason / Notes</label>
+      <textarea id="jobChangeReason" placeholder="e.g. Customer requested to postpone…" style="min-height:70px"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('jobChangeBg').classList.remove('open')">Cancel</button>
+      <button class="btn-confirm" onclick="submitJobChangeRequest()">Send Request</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="photoBg">
   <div class="modal" style="max-width:520px">
     <h2 id="photoTitle">📷 Photos</h2>
@@ -1937,6 +1968,19 @@ function renderDay() {
       const statusBadge = card.querySelector('.status-badge');
       statusBadge.parentNode.insertBefore(locDiv, statusBadge);
     }
+    // Change request button for salesman's own jobs
+    if (currentRole === 'salesman' && currentUser) {
+      const isOwn = job.salesmanUid === currentUser.uid ||
+        (!job.salesmanUid && job.salesman && job.salesman === (currentScheduleName || document.getElementById('userName').textContent));
+      if (isOwn) {
+        const reqBtn = document.createElement('button');
+        reqBtn.className = 'btn-edit-job';
+        reqBtn.title = 'Request date change or cancellation';
+        reqBtn.textContent = '🔄';
+        reqBtn.onclick = () => openJobChangeRequest(currentDay, idx);
+        card.querySelector('.job-actions').appendChild(reqBtn);
+      }
+    }
     list.appendChild(card);
   });
 }
@@ -2917,6 +2961,51 @@ function removeReqFile(idx) {
   renderReqFileList();
 }
 
+// ---- Job Change Request (salesman) ----
+let jobChangeContext = null;
+
+function openJobChangeRequest(dayKey, jobIdx) {
+  const job = getDayData(dayKey).jobs[jobIdx];
+  if (!job) return;
+  jobChangeContext = { dayKey, jobIdx };
+  document.getElementById('jobChangeInfo').innerHTML =
+    `<strong>${job.customer || 'Job'}</strong>` +
+    (job.address ? `<br>📍 ${job.address}` : '') +
+    `<br>📅 Scheduled: ${dayKey}`;
+  document.getElementById('jobChangeDate').value = '';
+  document.getElementById('jobChangeReason').value = '';
+  document.querySelector('input[name="jobChangeType"][value="reschedule"]').checked = true;
+  document.getElementById('jobChangeDateRow').style.display = '';
+  document.getElementById('jobChangeBg').classList.add('open');
+}
+
+function toggleJobChangeDateRow(type) {
+  document.getElementById('jobChangeDateRow').style.display = type === 'reschedule' ? '' : 'none';
+}
+
+function submitJobChangeRequest() {
+  if (!jobChangeContext) return;
+  const type = document.querySelector('input[name="jobChangeType"]:checked').value;
+  const newDate = document.getElementById('jobChangeDate').value;
+  const reason = document.getElementById('jobChangeReason').value.trim();
+  if (type === 'reschedule' && !newDate) { alert('Please select a preferred new date.'); return; }
+  const job = getDayData(jobChangeContext.dayKey).jobs[jobChangeContext.jobIdx];
+  if (!job) return;
+  const name = document.getElementById('userName').textContent || 'Salesman';
+  const lines = [
+    type === 'reschedule' ? `🔄 <b>Date Change Request</b>` : `❌ <b>Job Cancellation Request</b>`,
+    `👤 <b>${job.customer || 'Job'}</b>`,
+    job.address ? `📍 ${job.address}` : null,
+    `📅 Scheduled: ${jobChangeContext.dayKey}`,
+    type === 'reschedule' ? `📅 Preferred new date: ${newDate}` : null,
+    reason ? `📝 ${reason}` : null,
+    `🙋 By: ${name}`
+  ].filter(Boolean).join('\n');
+  sendTelegramToAdmins(lines);
+  document.getElementById('jobChangeBg').classList.remove('open');
+  alert(type === 'reschedule' ? 'Date change request sent to admin.' : 'Cancellation request sent to admin.');
+}
+
 // ---- Location sharing ----
 function shareJobLocation(dayKey, jobIdx) {
   if (!navigator.geolocation) { alert('Geolocation is not supported on this device.'); return; }
@@ -3277,7 +3366,7 @@ function loadWeek(monKey) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
-    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg'].forEach(id => {
+    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg','jobChangeBg'].forEach(id => {
       document.getElementById(id).classList.remove('open');
     });
   }
