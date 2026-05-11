@@ -2553,7 +2553,6 @@ function renderSummary() {
   }
 
   let grandTotal = 0;
-  let rows = '';
 
   if (currentRole === 'salesman') {
     // Salesman view: flat list of own jobs with Accept/Comment actions
@@ -2590,24 +2589,18 @@ function renderSummary() {
       tdAmt.textContent = j.amount > 0 ? 'RM ' + j.amount.toLocaleString('en', {minimumFractionDigits:2}) : '—';
       tr.appendChild(tdAmt);
 
-      // Action cell
+      // Action cell — salesman can comment; accept is admin-only
       const tdAct = document.createElement('td');
       tdAct.style.cssText = 'text-align:center;vertical-align:top;white-space:nowrap';
       if (j.ibAccepted) {
         const badge = document.createElement('div');
-        badge.style.cssText = 'color:#27ae60;font-size:11px;font-weight:700';
+        badge.style.cssText = 'color:#27ae60;font-size:11px;font-weight:700;margin-bottom:4px';
         const acceptedDate = j.ibAcceptedAt ? new Date(j.ibAcceptedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
         badge.textContent = `✓ Accepted${acceptedDate ? ' ' + acceptedDate : ''}`;
         tdAct.appendChild(badge);
-      } else {
-        const acceptBtn = document.createElement('button');
-        acceptBtn.style.cssText = 'background:#1a4a2e;border:1px solid #27ae60;color:#27ae60;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;margin-bottom:4px;display:block;width:100%';
-        acceptBtn.textContent = '✓ Accept';
-        acceptBtn.onclick = () => acceptIBJob(j.date, j.jobIdx);
-        tdAct.appendChild(acceptBtn);
       }
       const commentBtn = document.createElement('button');
-      commentBtn.style.cssText = 'background:#2a1a4a;border:1px solid #6c5ce7;color:#a29bfe;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:block;width:100%;margin-top:2px';
+      commentBtn.style.cssText = 'background:#2a1a4a;border:1px solid #6c5ce7;color:#a29bfe;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:block;width:100%';
       commentBtn.textContent = j.ibSalesmanComment ? '💬 Edit' : '💬 Comment';
       commentBtn.onclick = () => openIBComment(j.date, j.jobIdx, j.customer, j.ibSalesmanComment);
       tdAct.appendChild(commentBtn);
@@ -2625,32 +2618,80 @@ function renderSummary() {
     return;
   }
 
-  // Admin view: grouped by salesman
-  rows = salesmen.map(sm => {
+  // Admin view: grouped by salesman, DOM-based for Accept buttons
+  const adminTable = document.createElement('table');
+  adminTable.className = 'summary-table';
+  adminTable.innerHTML = '<thead><tr><th>Salesman / Jobs</th><th style="text-align:right">Amount</th><th style="text-align:center">Action</th></tr></thead>';
+  const adminTbody = document.createElement('tbody');
+
+  salesmen.forEach(sm => {
     const jobs = bySalesman[sm];
     const total = jobs.reduce((s, j) => s + j.amount, 0);
     grandTotal += total;
-    const jobList = jobs.map(j => {
-      const d = new Date(j.date);
-      return `<div class="job-item">${d.getDate()}/${d.getMonth()+1} — ${j.customer || '—'}${j.address ? ' · '+j.address : ''}${j.desc ? ' <span style="color:#666">'+j.desc+'</span>' : ''}</div>`;
-    }).join('');
-    return `<tr>
-      <td><div class="salesman-name" style="margin-bottom:4px">${sm}</div><div style="font-weight:400">${jobList}</div></td>
-      <td style="text-align:right;white-space:nowrap;color:#f39c12;font-weight:600;vertical-align:top">${total > 0 ? 'RM '+total.toLocaleString('en',{minimumFractionDigits:2}) : '—'}</td>
-      <td style="text-align:center;color:#aaa;vertical-align:top">${jobs.length}</td>
-    </tr>`;
-  }).join('');
 
+    // Salesman header row
+    const headerTr = document.createElement('tr');
+    const headerTd = document.createElement('td');
+    headerTd.colSpan = 3;
+    headerTd.style.cssText = 'padding-top:10px;padding-bottom:2px';
+    headerTd.innerHTML = `<div class="salesman-name">${sm}</div>`;
+    headerTr.appendChild(headerTd);
+    adminTbody.appendChild(headerTr);
+
+    // One row per job
+    jobs.forEach(j => {
+      const d = new Date(j.date);
+      const tr = document.createElement('tr');
+
+      // Job info cell
+      const tdInfo = document.createElement('td');
+      tdInfo.style.cssText = 'color:#ccc;padding-left:12px';
+      tdInfo.innerHTML = `<span style="color:#666;font-size:11px">${d.getDate()}/${d.getMonth()+1}</span> ${j.customer || '—'}` +
+        (j.address ? ` <span style="color:#666;font-size:11px">· ${j.address}</span>` : '') +
+        (j.desc ? ` <span style="color:#555;font-size:11px">${j.desc}</span>` : '') +
+        (j.ibSalesmanComment ? `<div style="font-size:11px;color:#6c5ce7;font-style:italic;margin-top:2px">💬 ${j.ibSalesmanComment}</div>` : '');
+      tr.appendChild(tdInfo);
+
+      // Amount cell
+      const tdAmt = document.createElement('td');
+      tdAmt.style.cssText = 'text-align:right;color:#f39c12;font-weight:600;white-space:nowrap;vertical-align:top';
+      tdAmt.textContent = j.amount > 0 ? 'RM ' + j.amount.toLocaleString('en',{minimumFractionDigits:2}) : '—';
+      tr.appendChild(tdAmt);
+
+      // Accept cell
+      const tdAct = document.createElement('td');
+      tdAct.style.cssText = 'text-align:center;vertical-align:top;white-space:nowrap';
+      if (j.ibAccepted) {
+        const badge = document.createElement('div');
+        badge.style.cssText = 'color:#27ae60;font-size:11px;font-weight:700';
+        const acceptedDate = j.ibAcceptedAt ? new Date(j.ibAcceptedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
+        badge.textContent = `✓ Accepted${acceptedDate ? ' ' + acceptedDate : ''}`;
+        tdAct.appendChild(badge);
+      } else {
+        const acceptBtn = document.createElement('button');
+        acceptBtn.style.cssText = 'background:#1a4a2e;border:1px solid #27ae60;color:#27ae60;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700';
+        acceptBtn.textContent = '✓ Accept';
+        acceptBtn.onclick = () => acceptIBJob(j.date, j.jobIdx);
+        tdAct.appendChild(acceptBtn);
+      }
+      tr.appendChild(tdAct);
+      adminTbody.appendChild(tr);
+    });
+
+    // Subtotal row
+    const subTr = document.createElement('tr');
+    subTr.innerHTML = `<td style="color:#aaa;font-size:11px;padding-left:12px">Subtotal (${jobs.length} job${jobs.length!==1?'s':''})</td><td style="text-align:right;color:#f39c12;font-weight:600;white-space:nowrap">RM ${total.toLocaleString('en',{minimumFractionDigits:2})}</td><td></td>`;
+    adminTbody.appendChild(subTr);
+  });
+
+  adminTable.appendChild(adminTbody);
   const totalCount = salesmen.reduce((s,sm)=>s+bySalesman[sm].length,0);
-  content.innerHTML = `
-    <table class="summary-table">
-      <thead><tr><th>Salesman / Jobs</th><th style="text-align:right">Amount</th><th style="text-align:center">Count</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 16px;background:#0f3460;border-radius:8px;border:2px solid #f39c12">
-      <span style="font-weight:700;color:#f39c12;font-size:14px">GRAND TOTAL (${totalCount} jobs)</span>
-      <span style="font-weight:700;color:#f39c12;font-size:16px">RM ${grandTotal.toLocaleString('en',{minimumFractionDigits:2})}</span>
-    </div>`;
+  const grandDiv = document.createElement('div');
+  grandDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 16px;background:#0f3460;border-radius:8px;border:2px solid #f39c12';
+  grandDiv.innerHTML = `<span style="font-weight:700;color:#f39c12;font-size:14px">GRAND TOTAL (${totalCount} jobs)</span><span style="font-weight:700;color:#f39c12;font-size:16px">RM ${grandTotal.toLocaleString('en',{minimumFractionDigits:2})}</span>`;
+  content.innerHTML = '';
+  content.appendChild(adminTable);
+  content.appendChild(grandDiv);
 }
 
 // ---- IB Accept / Comment ----
@@ -2664,19 +2705,17 @@ function acceptIBJob(dateKey, jobIdx) {
   day.jobs[jobIdx].ibAcceptedAt = Date.now();
   day.jobs[jobIdx].ibAcceptedBy = currentUser ? currentUser.uid : '';
   persistState();
-  // Notify admins
+  // Notify the salesman
   const job = day.jobs[jobIdx];
-  const myName = currentScheduleName || (document.getElementById('userName') ? document.getElementById('userName').textContent : '');
   const d = new Date(dateKey);
   const dateStr = d.toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'});
   const lines = [
-    `✅ IB Job Accepted`,
-    `Salesman: ${myName}`,
+    `✅ IB Job Accepted by Admin`,
     `Date: ${dateStr}`,
     `Customer: ${job.customer || '—'}`,
     `Amount: ${job.ibAmount > 0 ? 'RM ' + (job.ibAmount).toLocaleString('en',{minimumFractionDigits:2}) : '—'}`
   ].filter(Boolean).join('\n');
-  sendTelegramToAdmins(lines);
+  if (job.salesmanUid) sendTelegramToUser(job.salesmanUid, lines);
   renderSummary();
 }
 
