@@ -2563,7 +2563,7 @@ function renderSummary() {
     grandTotal = total;
     const tableEl = document.createElement('table');
     tableEl.className = 'summary-table';
-    tableEl.innerHTML = '<thead><tr><th>Date</th><th>Job</th><th style="text-align:right">Amount</th><th style="text-align:center">Action</th></tr></thead>';
+    tableEl.innerHTML = '<thead><tr><th>Job</th><th style="text-align:right">Amount</th><th style="text-align:center">Action</th></tr></thead>';
     const tbody = document.createElement('tbody');
     myJobs.forEach(j => {
       const d = new Date(j.date);
@@ -2571,16 +2571,11 @@ function renderSummary() {
       const statusColor = statusColors[j.status] || '#666';
       const tr = document.createElement('tr');
 
-      // Date cell
-      const tdDate = document.createElement('td');
-      tdDate.style.cssText = 'color:#aaa;white-space:nowrap;vertical-align:top';
-      tdDate.textContent = `${d.getDate()}/${d.getMonth()+1}`;
-      tr.appendChild(tdDate);
-
-      // Job detail cell
+      // Job detail cell (includes date)
       const tdJob = document.createElement('td');
       tdJob.style.cssText = 'color:#ccc;vertical-align:top';
-      tdJob.innerHTML = `<div style="font-weight:600">${j.customer || '—'}</div>` +
+      tdJob.innerHTML = `<div style="font-size:11px;color:#666;margin-bottom:2px">${d.getDate()}/${d.getMonth()+1}</div>` +
+        `<div style="font-weight:600">${j.customer || '—'}</div>` +
         (j.contact ? `<div style="font-size:11px;color:#aaa">📞 ${j.contact}</div>` : '') +
         (j.address ? `<div style="font-size:11px;color:#aaa">📍 ${j.address}</div>` : '') +
         (j.team ? `<div style="font-size:11px;color:#aaa">👷 ${j.team}</div>` : '') +
