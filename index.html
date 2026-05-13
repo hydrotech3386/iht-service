@@ -2638,7 +2638,7 @@ function renderSummary() {
       if (ibPendingFilter && (job.status !== 'completed' || job.ibAccepted)) return;
       const key = job.salesman || '(No salesman)';
       if (!bySalesman[key]) bySalesman[key] = [];
-      bySalesman[key].push({ date: dateKey, jobIdx, customer: job.customer, contact: job.contact, address: job.address, desc: job.desc, team: job.team, status: job.status, amount: job.ibAmount || 0, ibAccepted: job.ibAccepted || false, ibAcceptedAt: job.ibAcceptedAt || null, ibSalesmanComment: job.ibSalesmanComment || '' });
+      bySalesman[key].push({ date: dateKey, jobIdx, customer: job.customer, contact: job.contact, address: job.address, desc: job.desc, team: job.team, status: job.status, salesman: job.salesman || '', salesmanUid: job.salesmanUid || '', amount: job.ibAmount || 0, ibAccepted: job.ibAccepted || false, ibAcceptedAt: job.ibAcceptedAt || null, ibSalesmanComment: job.ibSalesmanComment || '', ibAdminComment: job.ibAdminComment || '' });
     });
   });
 
@@ -2670,6 +2670,9 @@ function renderSummary() {
       // Job detail cell (includes date)
       const tdJob = document.createElement('td');
       tdJob.style.cssText = 'color:#ccc;vertical-align:top';
+      tdJob.style.cursor = 'pointer';
+      tdJob.title = 'Go to this day';
+      tdJob.onclick = () => goToIBJob(j.date);
       tdJob.innerHTML = `<div style="font-size:11px;color:#666;margin-bottom:2px">${d.getDate()}/${d.getMonth()+1}</div>` +
         `<div style="font-weight:600">${j.customer || '—'}</div>` +
         (j.contact ? `<div style="font-size:11px;color:#aaa">📞 ${j.contact}</div>` : '') +
@@ -2677,7 +2680,8 @@ function renderSummary() {
         (j.team ? `<div style="font-size:11px;color:#aaa">👷 ${j.team}</div>` : '') +
         (j.desc ? `<div style="font-size:11px;color:#888;margin-top:2px">${j.desc}</div>` : '') +
         (j.status ? `<div style="font-size:10px;color:${statusColor};margin-top:2px;text-transform:uppercase;font-weight:600">${j.status}</div>` : '') +
-        (j.ibSalesmanComment ? `<div style="font-size:11px;color:#6c5ce7;margin-top:3px;font-style:italic">💬 ${j.ibSalesmanComment}</div>` : '');
+        (j.ibSalesmanComment ? `<div style="font-size:11px;color:#6c5ce7;margin-top:3px;font-style:italic">💬 You: ${j.ibSalesmanComment}</div>` : '') +
+        (j.ibAdminComment ? `<div style="font-size:11px;color:#4fc3f7;margin-top:3px;font-style:italic">💬 Admin: ${j.ibAdminComment}</div>` : '');
       tr.appendChild(tdJob);
 
       // Amount cell
@@ -2705,7 +2709,7 @@ function renderSummary() {
       const commentBtn = document.createElement('button');
       commentBtn.style.cssText = 'background:#2a1a4a;border:1px solid #6c5ce7;color:#a29bfe;border-radius:5px;padding:4px 8px;cursor:pointer;font-size:11px;font-weight:700;display:block;width:100%;margin-top:2px';
       commentBtn.textContent = j.ibSalesmanComment ? '💬 Edit' : '💬 Comment';
-      commentBtn.onclick = () => openIBComment(j.date, j.jobIdx, j.customer, j.ibSalesmanComment);
+      commentBtn.onclick = (e) => { e.stopPropagation(); openIBComment(j.date, j.jobIdx, j.customer, j.ibSalesmanComment); };
       tdAct.appendChild(commentBtn);
       tr.appendChild(tdAct);
 
@@ -2742,22 +2746,38 @@ function renderSummary() {
       const item = document.createElement('div');
       item.className = 'job-item';
       item.style.cssText = 'display:flex;align-items:center;gap:6px;flex-wrap:wrap';
-      item.innerHTML = `${d.getDate()}/${d.getMonth()+1} — ${j.customer || '—'}${j.address ? ' · <span style="color:#666">'+j.address+'</span>' : ''}${j.desc ? ' <span style="color:#666">'+j.desc+'</span>' : ''}`;
+      item.style.cssText = 'display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;cursor:pointer;padding:4px 0;border-bottom:1px solid #0f3460';
+      item.title = 'Go to this day';
+      item.onclick = (e) => { if (!e.target.closest('button')) goToIBJob(j.date); };
+      const itemInfo = document.createElement('div');
+      itemInfo.style.cssText = 'flex:1;min-width:0';
+      itemInfo.innerHTML = `<span>${d.getDate()}/${d.getMonth()+1} — ${j.customer || '—'}${j.address ? ' · <span style="color:#666">'+j.address+'</span>' : ''}${j.desc ? ' <span style="color:#666;font-size:11px">'+j.desc+'</span>' : ''}</span>` +
+        (j.ibSalesmanComment ? `<div style="font-size:11px;color:#6c5ce7;margin-top:2px;font-style:italic">💬 ${j.salesman||'Salesman'}: ${j.ibSalesmanComment}</div>` : '') +
+        (j.ibAdminComment ? `<div style="font-size:11px;color:#4fc3f7;margin-top:2px;font-style:italic">💬 Admin: ${j.ibAdminComment}</div>` : '');
+      item.appendChild(itemInfo);
+      const actionsDiv = document.createElement('div');
+      actionsDiv.style.cssText = 'display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap;align-items:center';
       if (isOffice) {
         if (j.ibAccepted) {
           const badge = document.createElement('span');
           badge.style.cssText = 'color:#27ae60;font-size:10px;font-weight:700;white-space:nowrap';
           const acceptedDate = j.ibAcceptedAt ? new Date(j.ibAcceptedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
           badge.textContent = `✓ Accepted${acceptedDate ? ' '+acceptedDate : ''}`;
-          item.appendChild(badge);
+          actionsDiv.appendChild(badge);
         } else {
           const btn = document.createElement('button');
           btn.style.cssText = 'background:#1a4a2e;border:1px solid #27ae60;color:#27ae60;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:10px;font-weight:700;white-space:nowrap';
           btn.textContent = '✓ Accept';
-          btn.onclick = () => acceptIBJob(j.date, j.jobIdx);
-          item.appendChild(btn);
+          btn.onclick = (e) => { e.stopPropagation(); acceptIBJob(j.date, j.jobIdx); };
+          actionsDiv.appendChild(btn);
         }
       }
+      const commentBtn = document.createElement('button');
+      commentBtn.style.cssText = 'background:#2a1a4a;border:1px solid #6c5ce7;color:#a29bfe;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:10px;font-weight:700;white-space:nowrap';
+      commentBtn.textContent = j.ibAdminComment ? '💬 Edit' : '💬 Comment';
+      commentBtn.onclick = (e) => { e.stopPropagation(); openIBComment(j.date, j.jobIdx, j.customer, j.ibAdminComment); };
+      actionsDiv.appendChild(commentBtn);
+      item.appendChild(actionsDiv);
       tdJobs.appendChild(item);
     });
     tr.appendChild(tdJobs);
@@ -2802,7 +2822,7 @@ function acceptIBJob(dateKey, jobIdx) {
 }
 
 function openIBComment(dateKey, jobIdx, customer, existing) {
-  ibCommentContext = { dateKey, jobIdx };
+  ibCommentContext = { dateKey, jobIdx, isAdmin: currentRole === 'admin' };
   document.getElementById('ibCommentJobLabel').textContent = customer || 'Job';
   document.getElementById('ibCommentText').value = existing || '';
   document.getElementById('ibCommentBg').classList.add('open');
@@ -2815,9 +2835,13 @@ function submitIBComment() {
   const text = document.getElementById('ibCommentText').value.trim();
   const day = getDayData(dateKey);
   if (!day.jobs[jobIdx]) return;
-  day.jobs[jobIdx].ibSalesmanComment = text;
+  const isAdmin = ibCommentContext.isAdmin;
+  if (isAdmin) {
+    day.jobs[jobIdx].ibAdminComment = text;
+  } else {
+    day.jobs[jobIdx].ibSalesmanComment = text;
+  }
   persistState();
-  // Notify admins
   const job = day.jobs[jobIdx];
   const myName = currentScheduleName || (document.getElementById('userName') ? document.getElementById('userName').textContent : '');
   const d = new Date(dateKey);
@@ -2825,12 +2849,13 @@ function submitIBComment() {
   if (text) {
     const lines = [
       `💬 IB Job Comment`,
-      `Salesman: ${myName}`,
+      isAdmin ? `Admin: ${myName}` : `Salesman: ${myName}`,
       `Date: ${dateStr}`,
       `Customer: ${job.customer || '—'}`,
       `Comment: ${text}`
     ].filter(Boolean).join('\n');
-    sendTelegramToAdmins(lines);
+    if (isAdmin && job.salesmanUid) sendTelegramToUser(job.salesmanUid, lines);
+    else sendTelegramToAdmins(lines);
   }
   document.getElementById('ibCommentBg').classList.remove('open');
   ibCommentContext = null;
@@ -3603,6 +3628,14 @@ document.addEventListener('keydown', e => {
 });
 
 init();
+
+function goToIBJob(dateKey) {
+  document.getElementById('summaryBg').classList.remove('open');
+  const d = new Date(dateKey + 'T00:00:00');
+  state.weekStart = getMonday(d);
+  currentDay = dateKey;
+  render();
+}
 
 // ---- Salesman My Jobs filter ----
 let salesmanMyJobsOnly = false;
