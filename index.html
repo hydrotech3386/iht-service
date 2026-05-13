@@ -413,6 +413,12 @@
     .month-selector select { font-size: 15px !important; padding: 8px; }
   }
 
+  /* Salesman My Jobs toggle */
+  .btn-my-jobs{display:none;background:#0f3460;border:1px solid #2980b9;color:#4fc3f7}
+  .btn-my-jobs:hover{background:#1a3a6a;color:#fff}
+  .btn-my-jobs.active{background:#2980b9;color:#fff;border-color:#2980b9}
+  .role-salesman .btn-my-jobs{display:inline-flex;align-items:center}
+
   /* Search */
   .btn-search{background:#1a6fa8;color:#fff}
   .btn-search:hover{background:#155d8f}
@@ -494,6 +500,7 @@
 
 <div class="toolbar">
   <button class="btn-add" onclick="openModal()">+ Add Job</button>
+  <button class="btn-my-jobs" id="btnMyJobs" onclick="toggleMyJobs()">👤 My Jobs</button>
   <button class="btn-search" onclick="openSearch()">🔍 Search</button>
   <button class="btn-request" onclick="openServiceRequest()">📋 New Request</button>
   <button class="btn-requests" id="btnRequests" onclick="openRequestsPanel()">📬 Requests<span class="req-count" id="reqCount" style="display:none">0</span></button>
@@ -1966,12 +1973,19 @@ function renderDay() {
     return;
   }
 
-  if (data.jobs.length === 0) {
-    list.innerHTML = '<div class="empty-day">No jobs scheduled. Click "+ Add Job" to add.</div>';
+  let jobsToRender = data.jobs.map((job, idx) => ({ job, idx }));
+  if (currentRole === 'salesman' && salesmanMyJobsOnly) {
+    jobsToRender = jobsToRender.filter(({ job }) => isMyJob(job));
+  }
+
+  if (jobsToRender.length === 0) {
+    list.innerHTML = (currentRole === 'salesman' && salesmanMyJobsOnly)
+      ? '<div class="empty-day">No jobs assigned to you today.</div>'
+      : '<div class="empty-day">No jobs scheduled. Click "+ Add Job" to add.</div>';
     return;
   }
 
-  data.jobs.forEach((job, idx) => {
+  jobsToRender.forEach(({ job, idx }, displayIdx) => {
     const cmtCount = (job.comments || []).length;
     const status = job.status || 'pending';
     const statusLabel = STATUS_LABELS[status] || status;
@@ -1980,7 +1994,7 @@ function renderDay() {
     const card = document.createElement('div');
     card.className = 'job-card' + (showIB ? ' internal-billing' : '');
     card.innerHTML = `
-      <div class="job-num">${idx+1}</div>
+      <div class="job-num">${displayIdx+1}</div>
       <div class="job-body">
         <div class="job-team">${job.team || ''}${showIB ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}</div>
         <div class="job-customer">${job.customer || ''}${job.contact ? ' <span class="contact">'+job.contact+'</span>' : ''}${job.address ? ' '+job.address : ''}${job.salesman ? ' ('+job.salesman+')' : ''}</div>
@@ -3589,6 +3603,24 @@ document.addEventListener('keydown', e => {
 });
 
 init();
+
+// ---- Salesman My Jobs filter ----
+let salesmanMyJobsOnly = false;
+
+function isMyJob(job) {
+  if (!currentUser) return false;
+  const myName = currentScheduleName || (document.getElementById('userName') ? document.getElementById('userName').textContent : '');
+  return job.salesmanUid === currentUser.uid ||
+    (!job.salesmanUid && job.salesman && job.salesman === myName);
+}
+
+function toggleMyJobs() {
+  salesmanMyJobsOnly = !salesmanMyJobsOnly;
+  const btn = document.getElementById('btnMyJobs');
+  btn.classList.toggle('active', salesmanMyJobsOnly);
+  btn.textContent = salesmanMyJobsOnly ? '📋 Full Schedule' : '👤 My Jobs';
+  render();
+}
 
 // ---- Search ----
 function openSearch() {
