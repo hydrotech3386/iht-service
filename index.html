@@ -3615,8 +3615,9 @@ function doSearch() {
     if (!entry) return;
     const jobs = Array.isArray(entry.jobs) ? entry.jobs : Object.values(entry.jobs || {});
     jobs.forEach(job => {
+      const teamArr = Array.isArray(job.team) ? job.team : Object.values(job.team || {});
       const haystack = [job.customer||'', job.address||'', job.contact||'', job.desc||'',
-        (job.team||[]).join(' '), job.salesman||''].join(' ').toLowerCase();
+        teamArr.join(' '), job.salesman||''].join(' ').toLowerCase();
       if (haystack.includes(q)) results.push({ dayKey, job });
     });
   });
@@ -3629,7 +3630,7 @@ function doSearch() {
   container.innerHTML = results.map(({ dayKey, job }) => {
     const d = new Date(dayKey + 'T00:00:00');
     const dateStr = DAY_NAMES[d.getDay()] + ', ' + fmtDate(d);
-    const team = (job.team || []).join(', ');
+    const team = (Array.isArray(job.team) ? job.team : Object.values(job.team || {})).join(', ');
     const desc = (job.desc || '').slice(0, 80);
     const salesman = job.salesman ? ' <span style="color:#f39c12;font-size:11px;font-weight:normal">(' + job.salesman + ')</span>' : '';
     return '<div class="search-result" onclick="goToJob(\'' + dayKey + '\')">'
