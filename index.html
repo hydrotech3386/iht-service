@@ -412,6 +412,17 @@
     .summary-table th, .summary-table td { padding: 8px 6px; font-size: 12px; }
     .month-selector select { font-size: 15px !important; padding: 8px; }
   }
+
+  /* Search */
+  .btn-search{background:#1a6fa8;color:#fff}
+  .btn-search:hover{background:#155d8f}
+  .search-result{padding:10px 12px;border:1px solid #0f3460;border-radius:8px;cursor:pointer;margin-bottom:6px;transition:background .15s}
+  .search-result:hover{background:#1e3a5f}
+  .sr-date{font-size:11px;color:#e94560;font-weight:700;margin-bottom:3px}
+  .sr-customer{font-size:13px;color:#fff;font-weight:600}
+  .sr-team{font-size:11px;color:#5dfc8d;margin-top:2px}
+  .sr-desc{font-size:11px;color:#888;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .search-empty{color:#555;text-align:center;padding:24px;font-size:13px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
@@ -483,6 +494,7 @@
 
 <div class="toolbar">
   <button class="btn-add" onclick="openModal()">+ Add Job</button>
+  <button class="btn-search" onclick="openSearch()">🔍 Search</button>
   <button class="btn-request" onclick="openServiceRequest()">📋 New Request</button>
   <button class="btn-requests" id="btnRequests" onclick="openRequestsPanel()">📬 Requests<span class="req-count" id="reqCount" style="display:none">0</span></button>
   <button class="btn-copy" onclick="showWAPreview()">📋 Copy for WhatsApp</button>
@@ -827,6 +839,21 @@
     <div class="modal-actions">
       <button class="btn-cancel" onclick="document.getElementById('rescheduleBg').classList.remove('open')">Cancel</button>
       <button class="btn-confirm" onclick="confirmReschedule()">📅 Move Job</button>
+    </div>
+  </div>
+</div>
+
+<!-- Search Modal -->
+<div class="modal-bg" id="searchBg" onclick="if(event.target===this)closeSearch()">
+  <div class="modal" style="max-width:560px">
+    <h2>🔍 Search Jobs</h2>
+    <div class="form-row" style="margin-bottom:8px">
+      <input type="text" id="searchInput" placeholder="Search customer, address, team, description…"
+             oninput="doSearch()" autocomplete="off">
+    </div>
+    <div id="searchResults"><div class="search-empty">Type to search jobs…</div></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeSearch()">Close</button>
     </div>
   </div>
 </div>
@@ -3562,6 +3589,65 @@ document.addEventListener('keydown', e => {
 });
 
 init();
+
+// ---- Search ----
+function openSearch() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchResults').innerHTML = '<div class="search-empty">Type to search jobs…</div>';
+  document.getElementById('searchBg').classList.add('open');
+  setTimeout(() => document.getElementById('searchInput').focus(), 100);
+}
+
+function closeSearch() {
+  document.getElementById('searchBg').classList.remove('open');
+}
+
+function doSearch() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const container = document.getElementById('searchResults');
+  if (!q) {
+    container.innerHTML = '<div class="search-empty">Type to search jobs…</div>';
+    return;
+  }
+  const results = [];
+  Object.keys(state.schedule || {}).forEach(dayKey => {
+    const entry = state.schedule[dayKey];
+    if (!entry) return;
+    const jobs = Array.isArray(entry.jobs) ? entry.jobs : Object.values(entry.jobs || {});
+    jobs.forEach(job => {
+      const haystack = [job.customer||'', job.address||'', job.contact||'', job.desc||'',
+        (job.team||[]).join(' '), job.salesman||''].join(' ').toLowerCase();
+      if (haystack.includes(q)) results.push({ dayKey, job });
+    });
+  });
+  results.sort((a, b) => b.dayKey.localeCompare(a.dayKey));
+  if (!results.length) {
+    container.innerHTML = '<div class="search-empty">No jobs found.</div>';
+    return;
+  }
+  const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  container.innerHTML = results.map(({ dayKey, job }) => {
+    const d = new Date(dayKey + 'T00:00:00');
+    const dateStr = DAY_NAMES[d.getDay()] + ', ' + fmtDate(d);
+    const team = (job.team || []).join(', ');
+    const desc = (job.desc || '').slice(0, 80);
+    const salesman = job.salesman ? ' <span style="color:#f39c12;font-size:11px;font-weight:normal">(' + job.salesman + ')</span>' : '';
+    return '<div class="search-result" onclick="goToJob(\'' + dayKey + '\')">'
+      + '<div class="sr-date">' + dateStr + '</div>'
+      + '<div class="sr-customer">' + (job.customer || '—') + salesman + '</div>'
+      + (team ? '<div class="sr-team">👷 ' + team + '</div>' : '')
+      + (desc ? '<div class="sr-desc">' + desc + '</div>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function goToJob(dayKey) {
+  const d = new Date(dayKey + 'T00:00:00');
+  state.weekStart = getMonday(d);
+  currentDay = dayKey;
+  closeSearch();
+  render();
+}
 </script>
 </body>
 </html>
