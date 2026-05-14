@@ -1224,7 +1224,8 @@ function startEditName() {
 
 function setupFirebaseListener() {
   setSyncStatus('syncing');
-  // Clean up any existing request listener before re-attaching
+  // Clean up existing listeners before re-attaching
+  if (fbRef) fbRef.off();
   if (fbReqRef) { fbReqRef.off(); fbReqRef = null; }
   // Live request badge for admin
   if (currentRole === 'admin') {
