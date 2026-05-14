@@ -1223,6 +1223,7 @@ function setupFirebaseListener() {
   // Clean up existing listeners before re-attaching
   if (fbRef) fbRef.off();
   if (fbReqRef) { fbReqRef.off(); fbReqRef = null; }
+  isFirstSchedSnap = true;
   // Live request badge for admin
   if (currentRole === 'admin') {
     fbReqRef = firebase.database().ref('requests');
@@ -1270,7 +1271,6 @@ function setupFirebaseListener() {
         const fbTs = fbData.lastModified || 0;
         if (fbTs > localTs) {
           const oldCounts = isFirstSchedSnap ? null : snapshotCommentCounts();
-          const oldRevNums = isFirstSchedSnap ? null : Object.assign({}, state.revNums || {});
           const savedWeekStart = state.weekStart;
           const savedCurrentDay = currentDay;
           try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
@@ -1280,7 +1280,6 @@ function setupFirebaseListener() {
           if (isFirstSchedSnap) { isFirstSchedSnap = false; }
           else {
             if (oldCounts) checkNewComments(oldCounts);
-            if (oldRevNums) checkRevisionChanges(oldRevNums);
           }
           try { render(); } catch(e) {}
           if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
@@ -1794,7 +1793,12 @@ function init() {
     currentDay = (_t >= _m && _t <= _s) ? _t : _m;
   }
   document.getElementById('revNum').value = state.revNums[weekKey(state.weekStart)] || 0;
-  document.getElementById('revNum').addEventListener('change', e => { state.revNums[weekKey(state.weekStart)] = parseInt(e.target.value)||0; persistState(); });
+  document.getElementById('revNum').addEventListener('change', e => {
+    const oldRevNums = Object.assign({}, state.revNums || {});
+    state.revNums[weekKey(state.weekStart)] = parseInt(e.target.value) || 0;
+    persistState();
+    checkRevisionChanges(oldRevNums);
+  });
   try { render(); } catch(e) { console.error('Render error:', e); }
 
   // 2. Init Firebase
@@ -2489,7 +2493,7 @@ function addComment() {
   job.comments.push({ text, ts: Date.now(), authorUid, authorName });
   document.getElementById('commentInput').value = '';
   renderCommentList(job.comments);
-  // Send notifications only from the commenter's client (avoids duplicates when multiple clients are connected)
+  // Send notifications — single users fetch, deduplicate by chatId so each Telegram account gets exactly one message
   const preview = text.slice(0, 200);
   const jobInfo = [
     job.address ? `📍 ${job.address}` : null,
@@ -2497,11 +2501,17 @@ function addComment() {
   ].filter(Boolean).join('\n');
   const adminMsg = `💬 <b>New Comment</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${authorName}: ${preview}`;
   const jobMsg = `💬 <b>New Comment on Your Job</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${authorName}: ${preview}`;
-  sendTelegramToAdmins(adminMsg, authorUid);
-  if (job.salesmanUid && job.salesmanUid !== authorUid) {
-    sendTelegramToUser(job.salesmanUid, jobMsg);
-  }
-  sendTelegramToJobTechnicians(job, jobMsg, authorUid);
+  const teamArr = toTeamArr(job.team);
+  firebase.database().ref('users').once('value').then(snap => {
+    const sent = new Set();
+    snap.forEach(child => {
+      const u = child.val(); const uid = child.key;
+      if (!u.telegramChatId || uid === authorUid || sent.has(u.telegramChatId)) return;
+      if (u.role === 'admin') { sent.add(u.telegramChatId); sendTelegram(u.telegramChatId, adminMsg); }
+      else if (uid === job.salesmanUid) { sent.add(u.telegramChatId); sendTelegram(u.telegramChatId, jobMsg); }
+      else if (u.role === 'technician' && teamArr.includes(u.name)) { sent.add(u.telegramChatId); sendTelegram(u.telegramChatId, jobMsg); }
+    });
+  }).catch(() => {});
   // Anonymous view-only users write only this day's jobs atomically
   if (VIEW_ONLY || currentRole === 'view-only') {
     saveCommentToFirebase(dayKey, data.jobs);
