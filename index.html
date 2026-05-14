@@ -926,6 +926,21 @@ function sendTelegramToTechnicians(text) {
   }).catch(() => {});
 }
 
+function sendTelegramToJobTechnicians(job, text, excludeUid) {
+  const teamArr = Array.isArray(job.team) ? job.team :
+    (typeof job.team === 'string' ? job.team.split(',').map(s => s.trim()).filter(Boolean) : Object.values(job.team || {}));
+  if (!teamArr.length) return;
+  firebase.database().ref('users').once('value').then(snap => {
+    snap.forEach(child => {
+      const u = child.val();
+      const uid = child.key;
+      if (u.role === 'technician' && u.telegramChatId && uid !== excludeUid && teamArr.includes(u.name)) {
+        sendTelegram(u.telegramChatId, text);
+      }
+    });
+  }).catch(() => {});
+}
+
 function sendTelegramToUser(uid, text) {
   if (!uid) return;
   firebase.database().ref('users/' + uid + '/telegramChatId').once('value').then(snap => {
@@ -1047,11 +1062,12 @@ function checkNewComments(oldCounts) {
             `📅 ${dayKey}`
           ].filter(Boolean).join('\n');
           const adminMsg = `💬 <b>New Comment</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${author}: ${preview}`;
-          const salesmanMsg = `💬 <b>New Comment on Your Job</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${author}: ${preview}`;
+          const jobMsg = `💬 <b>New Comment on Your Job</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${author}: ${preview}`;
           sendTelegramToAdmins(adminMsg);
           if (job.salesmanUid && job.salesmanUid !== c.authorUid) {
-            sendTelegramToUser(job.salesmanUid, salesmanMsg);
+            sendTelegramToUser(job.salesmanUid, jobMsg);
           }
+          sendTelegramToJobTechnicians(job, jobMsg, c.authorUid);
         }
       }
     });
