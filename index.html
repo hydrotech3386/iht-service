@@ -2641,8 +2641,8 @@ function addComment() {
       }
     });
   }).catch(() => {});
-  // Anonymous view-only users write only this day's jobs atomically
-  if (VIEW_ONLY || currentRole === 'view-only') {
+  // Technicians and view-only users write only this day's jobs (no full-state write permission)
+  if (VIEW_ONLY || currentRole === 'view-only' || currentRole === 'technician') {
     saveCommentToFirebase(dayKey, data.jobs);
   } else {
     persistState();
@@ -3147,7 +3147,7 @@ function handlePhotoFile(event) {
     if (!job) return;
     if (!job.photos) job.photos = [];
     job.photos.push(newPhoto);
-    persistState();
+    if (currentRole === 'technician') saveCommentToFirebase(photoContext.dayKey, d.jobs); else persistState();
     renderPhotoGrid(job.photos);
     renderDay();
     msg.style.color = '#4caf50';
@@ -3175,7 +3175,7 @@ function deletePhoto(idx) {
   const job = d.jobs[photoContext.jobIdx];
   if (!job || !job.photos) return;
   job.photos.splice(idx, 1);
-  persistState();
+  if (currentRole === 'technician') saveCommentToFirebase(photoContext.dayKey, d.jobs); else persistState();
   renderPhotoGrid(job.photos);
   renderDay();
 }
@@ -3295,7 +3295,7 @@ function handleFileUpload(event) {
     if (!job) return;
     if (!job.files) job.files = [];
     job.files.push(newFile);
-    persistState();
+    if (currentRole === 'technician') saveCommentToFirebase(fileContext.dayKey, d.jobs); else persistState();
     renderFileList(job.files);
     renderDay();
     msg.style.color = '#4caf50';
@@ -3333,7 +3333,7 @@ function deleteFile(idx) {
   const job = d.jobs[fileContext.jobIdx];
   if (!job || !job.files) return;
   job.files.splice(idx, 1);
-  persistState();
+  if (currentRole === 'technician') saveCommentToFirebase(fileContext.dayKey, d.jobs); else persistState();
   renderFileList(job.files);
   renderDay();
 }
