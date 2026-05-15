@@ -262,9 +262,13 @@
   .leave-chip.mc .chip-name{color:#9b59b6}
   .leave-chip.mc{border-color:#9b59b6}
   .leave-chip.mc .chip-btn.btn-mc{background:#9b59b6;color:#fff}
+  .leave-chip.half .chip-name{color:#1abc9c}
+  .leave-chip.half{border-color:#1abc9c}
+  .leave-chip.half .chip-btn.btn-half{background:#1abc9c;color:#fff}
   .absence-badge{font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle}
   .absence-badge.leave{background:#e67e22;color:#fff}
   .absence-badge.mc{background:#9b59b6;color:#fff}
+  .absence-badge.half{background:#1abc9c;color:#fff}
 
   /* Service Requests */
   .btn-request{background:#e67e22;color:#fff}
@@ -1998,7 +2002,8 @@ function renderLeaveRow() {
     chip.className = 'leave-chip' + (status ? ' ' + status : '');
     chip.innerHTML = `
       <span class="chip-name">${name}</span>
-      <button class="chip-btn btn-leave" onclick="setAbsence('${name}','leave')" title="Mark Leave">AL</button>
+      <button class="chip-btn btn-leave" onclick="setAbsence('${name}','leave')" title="Mark AL">AL</button>
+      <button class="chip-btn btn-half" onclick="setAbsence('${name}','half')" title="Mark AL Half Day">½AL</button>
       <button class="chip-btn btn-mc" onclick="setAbsence('${name}','mc')" title="Mark MC">MC</button>`;
     row.appendChild(chip);
   });
@@ -2183,13 +2188,13 @@ function renderMemberGrid(selectedMembers) {
   });
   state.members.forEach(name => {
     const checked = selectedMembers.includes(name);
-    const absStatus = absence[name]; // 'leave', 'mc', or undefined
+    const absStatus = absence[name]; // 'leave', 'mc', 'half', or undefined
     const isAssigned = assignedSet.has(name);
     let chipClass = 'member-chip';
     if (checked) chipClass += ' checked';
-    if (absStatus) chipClass += ' absent';
+    if (absStatus === 'leave' || absStatus === 'mc') chipClass += ' absent';
     else if (isAssigned && !checked) chipClass += ' assigned';
-    const suffix = absStatus === 'leave' ? ' (AL)' : absStatus === 'mc' ? ' (MC)' : isAssigned ? ' *' : '';
+    const suffix = absStatus === 'leave' ? ' (AL)' : absStatus === 'mc' ? ' (MC)' : absStatus === 'half' ? ' (½AL)' : isAssigned ? ' *' : '';
     const chip = document.createElement('label');
     chip.className = chipClass;
     chip.innerHTML = `<input type="checkbox" value="${name}" ${checked ? 'checked' : ''} ${absStatus ? 'disabled' : ''}>${name}${suffix}`;
@@ -2594,8 +2599,10 @@ function buildWAText() {
 
     const absence = data.absence || {};
     const onLeave = Object.keys(absence).filter(n => absence[n] === 'leave');
+    const onHalf = Object.keys(absence).filter(n => absence[n] === 'half');
     const onMC = Object.keys(absence).filter(n => absence[n] === 'mc');
     if (onLeave.length) lines.push(`*(${onLeave.join(', ')} on leave)*`);
+    if (onHalf.length) lines.push(`*(${onHalf.join(', ')} on AL half day)*`);
     if (onMC.length) lines.push(`*(${onMC.join(', ')} on MC)*`);
 
     // Group consecutive jobs by team
@@ -3522,12 +3529,14 @@ function exportWeekPDF() {
     // Absence line
     const absence = data.absence || {};
     const onLeave = Object.keys(absence).filter(n => absence[n] === 'leave');
+    const onHalf = Object.keys(absence).filter(n => absence[n] === 'half');
     const onMC = Object.keys(absence).filter(n => absence[n] === 'mc');
-    if (onLeave.length || onMC.length) {
+    if (onLeave.length || onHalf.length || onMC.length) {
       doc.setFontSize(8);
       doc.setFont('helvetica', 'italic');
       const parts = [];
       if (onLeave.length) parts.push(onLeave.join(', ') + ' on Annual Leave');
+      if (onHalf.length) parts.push(onHalf.join(', ') + ' on AL Half Day');
       if (onMC.length) parts.push(onMC.join(', ') + ' on MC');
       doc.setTextColor(210, 130, 50);
       doc.text(parts.join('   |   '), margin + 3, y);
