@@ -269,6 +269,8 @@
   .absence-badge.leave{background:#e67e22;color:#fff}
   .absence-badge.mc{background:#9b59b6;color:#fff}
   .absence-badge.half{background:#1abc9c;color:#fff}
+  .job-card.rescheduled-job{opacity:0.5;border-style:dashed;border-color:#555}
+  .reschedule-badge{display:inline-flex;align-items:center;gap:4px;background:#2a1a00;color:#f39c12;font-size:11px;font-weight:700;border-radius:6px;padding:3px 8px;margin-top:5px;border:1px solid #f39c12}
 
   /* Service Requests */
   .btn-request{background:#e67e22;color:#fff}
@@ -2054,6 +2056,36 @@ function renderDay() {
   }
 
   jobsToRender.forEach(({ job, idx }, displayIdx) => {
+    if (job.isRescheduledMarker) {
+      const finalLoc = job.jobId ? findJobLocation(job.jobId) : null;
+      const finalDate = finalLoc ? finalLoc.dayKey : (job.rescheduledTo || null);
+      const fmtD = finalDate ? new Date(finalDate + 'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '?';
+      const card = document.createElement('div');
+      card.className = 'job-card rescheduled-job';
+      card.innerHTML = `
+        <div class="job-num">${displayIdx+1}</div>
+        <div class="job-body" style="flex:1">
+          <div class="job-team">${job.team || ''}</div>
+          <div class="job-customer">${job.customer || ''}${job.address ? ' '+job.address : ''}${job.salesman ? ' ('+job.salesman+')' : ''}</div>
+          <div><span class="reschedule-badge">📅 Rescheduled → ${fmtD}</span></div>
+        </div>
+        <div class="job-actions">
+          <button class="btn-comment" onclick="openJobInteraction('${job.jobId}','comments')" title="Comments">💬</button>
+          <button class="btn-photo" onclick="openJobInteraction('${job.jobId}','photos')" title="Photos">📷</button>
+          <button class="btn-photo" onclick="openJobInteraction('${job.jobId}','files')" title="Files">📎</button>
+          <button class="btn-location" onclick="openJobInteraction('${job.jobId}','location')" title="Share location">📍</button>
+        </div>`;
+      if (currentRole === 'admin') {
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-edit-job';
+        delBtn.title = 'Remove marker';
+        delBtn.textContent = '✕';
+        delBtn.onclick = () => { getDayData(currentDay).jobs.splice(idx,1); persistState(); renderDay(); render(); };
+        card.querySelector('.job-actions').appendChild(delBtn);
+      }
+      list.appendChild(card);
+      return;
+    }
     const cmtCount = (job.comments || []).length;
     const status = job.status || 'pending';
     const statusLabel = STATUS_LABELS[status] || status;
@@ -2394,8 +2426,17 @@ function confirmReschedule() {
   const srcData = getDayData(currentDay);
   const job = srcData.jobs[reschedulingIdx];
   if (!job) return;
-  // Move job
-  srcData.jobs.splice(reschedulingIdx, 1);
+  // Move job, leave a rescheduled marker at original slot
+  srcData.jobs[reschedulingIdx] = {
+    isRescheduledMarker: true,
+    jobId: job.jobId,
+    customer: job.customer,
+    team: job.team,
+    address: job.address,
+    salesman: job.salesman,
+    salesmanUid: job.salesmanUid || null,
+    rescheduledTo: newDate
+  };
   getDayData(newDate).jobs.push(job);
   // Notify salesman
   if (job.salesmanUid) {
@@ -2445,10 +2486,25 @@ function findJobLocation(jobId) {
   for (const dk of Object.keys(state.schedule || {})) {
     const jobs = getDayData(dk).jobs;
     for (let i = 0; i < jobs.length; i++) {
-      if (jobs[i].jobId === jobId) return { dayKey: dk, jobIdx: i };
+      if (jobs[i].jobId === jobId && !jobs[i].isRescheduledMarker) return { dayKey: dk, jobIdx: i };
     }
   }
   return null;
+}
+
+function openJobInteraction(jobId, action) {
+  const loc = findJobLocation(jobId);
+  if (!loc) { alert('Job not found. It may have been moved further.'); return; }
+  const d = new Date(loc.dayKey + 'T00:00:00');
+  state.weekStart = getMonday(d);
+  currentDay = loc.dayKey;
+  render();
+  setTimeout(() => {
+    if (action === 'comments') openComments(loc.dayKey, loc.jobIdx);
+    else if (action === 'photos') openPhotos(loc.dayKey, loc.jobIdx);
+    else if (action === 'files') openFiles(loc.dayKey, loc.jobIdx);
+    else if (action === 'location') shareJobLocation(loc.dayKey, loc.jobIdx);
+  }, 80);
 }
 
 function openComments(dayKey, jobIdx) {
