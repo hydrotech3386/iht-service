@@ -1702,11 +1702,18 @@ function deleteUser(uid, name, role) {
 }
 
 // ---- Job Status ----
+function isTechOnJob(job) {
+  if (currentRole !== 'technician' || !currentUser) return false;
+  const myName = currentScheduleName || (document.getElementById('userName') ? document.getElementById('userName').textContent : '');
+  return toTeamArr(job.team).includes(myName);
+}
+
 function updateJobStatus(idx) {
   if (currentRole !== 'admin' && currentRole !== 'technician') return;
   const data = getDayData(currentDay);
   const job = data.jobs[idx];
   if (!job) return;
+  if (currentRole === 'technician' && !isTechOnJob(job)) return;
   const cur = job.status || 'pending';
   const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
   job.status = next;
@@ -2048,7 +2055,7 @@ function renderDay() {
     const cmtCount = (job.comments || []).length;
     const status = job.status || 'pending';
     const statusLabel = STATUS_LABELS[status] || status;
-    const canClickStatus = currentRole === 'admin' || currentRole === 'technician';
+    const canClickStatus = currentRole === 'admin' || (currentRole === 'technician' && isTechOnJob(job));
     const showIB = job.internalBilling && (currentRole !== 'salesman' || isOwnIBJob(job));
     const card = document.createElement('div');
     card.className = 'job-card' + (showIB ? ' internal-billing' : '');
