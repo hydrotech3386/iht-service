@@ -977,6 +977,36 @@ function sendTelegramToJobTechnicians(job, text, excludeUid) {
   }).catch(() => {});
 }
 
+function sendJobEventNotification(job, dayKey, jobIdx, actorUid, actorName, eventType, extraLine) {
+  try {
+    var icons = { photo: '📷', file: '📎', location: '📍' };
+    var labels = { photo: 'Photo Attached', file: 'File Attached', location: 'Location Shared' };
+    var tgMsg = (icons[eventType] || '🔔') + ' <b>' + (labels[eventType] || 'Job Update') + '</b>\n' +
+      '👤 <b>' + (job.customer || 'Job') + '</b>' +
+      (job.address ? '\n📍 ' + job.address : '') +
+      '\n📅 ' + dayKey +
+      (extraLine ? '\n' + extraLine : '') +
+      '\n✍️ By: ' + actorName;
+    var notifData = { type: eventType, customer: job.customer || '', dayKey: dayKey, jobIdx: jobIdx,
+      fromName: actorName, preview: labels[eventType] || 'Job update', ts: Date.now(), read: false };
+    var teamArr = toTeamArr(job.team);
+    firebase.database().ref('users').once('value').then(function(snap) {
+      var sentTg = new Set();
+      snap.forEach(function(child) {
+        var u = child.val(); var uid = child.key;
+        if (uid === actorUid) return;
+        var ok = u.role === 'admin' || uid === job.salesmanUid || (u.role === 'technician' && teamArr.includes(u.name));
+        if (!ok) return;
+        firebase.database().ref('notifications/' + uid).push(notifData).catch(function(){});
+        if (u.telegramChatId && !sentTg.has(u.telegramChatId)) {
+          sentTg.add(u.telegramChatId);
+          sendTelegram(u.telegramChatId, tgMsg);
+        }
+      });
+    }).catch(function(){});
+  } catch(e) {}
+}
+
 function sendTelegramToUser(uid, text) {
   if (!uid) return;
   firebase.database().ref('users/' + uid + '/telegramChatId').once('value').then(snap => {
@@ -3169,29 +3199,8 @@ function handlePhotoFile(event) {
     msg.style.color = '#4caf50';
     msg.textContent = '✓ Photo added.';
     setTimeout(() => { msg.textContent = ''; }, 2000);
-    // Send notifications
-    const uploaderUid = currentUser ? currentUser.uid : null;
-    const uploaderName = newPhoto.by || 'Someone';
-    const teamArr = toTeamArr(job.team);
-    const tgMsg = `📷 <b>Photo Attached</b>\n👤 <b>${job.customer || 'Job'}</b>${job.address ? `\n📍 ${job.address}` : ''}\n📅 ${photoContext.dayKey}\n✍️ By: ${uploaderName}`;
-    const notifBase = { type: 'photo', customer: job.customer || '', dayKey: photoContext.dayKey, jobIdx: photoContext.jobIdx, fromName: uploaderName, preview: 'Photo attached', ts: Date.now(), read: false };
-    firebase.database().ref('users').once('value').then(snap => {
-      const sentTg = new Set();
-      snap.forEach(child => {
-        const u = child.val(); const uid = child.key;
-        if (uid === uploaderUid) return;
-        let isRecipient = false;
-        if (u.role === 'admin') isRecipient = true;
-        else if (uid === job.salesmanUid) isRecipient = true;
-        else if (u.role === 'technician' && teamArr.includes(u.name)) isRecipient = true;
-        if (!isRecipient) return;
-        firebase.database().ref('notifications/' + uid).push(notifBase).catch(() => {});
-        if (u.telegramChatId && !sentTg.has(u.telegramChatId)) {
-          sentTg.add(u.telegramChatId);
-          sendTelegram(u.telegramChatId, tgMsg);
-        }
-      });
-    }).catch(() => {});
+    sendJobEventNotification(job, photoContext.dayKey, photoContext.jobIdx,
+      currentUser ? currentUser.uid : null, newPhoto.by || 'Someone', 'photo');
   }).catch(() => {
     msg.style.color = '#e94560';
     msg.textContent = 'Failed to process image.';
@@ -3340,6 +3349,8 @@ function handleFileUpload(event) {
     msg.style.color = '#4caf50';
     msg.textContent = '✓ File added.';
     setTimeout(() => { msg.textContent = ''; }, 2000);
+    sendJobEventNotification(job, fileContext.dayKey, fileContext.jobIdx,
+      currentUser ? currentUser.uid : null, newFile.by || 'Someone', 'file');
   };
   reader.onerror = () => { msg.style.color = '#e94560'; msg.textContent = 'Failed to read file.'; };
   reader.readAsDataURL(file);
@@ -3483,15 +3494,11 @@ function shareJobLocation(dayKey, jobIdx) {
       uid: currentUser ? currentUser.uid : null,
       ts: Date.now()
     };
-    persistState();
+    if (currentRole === 'technician') saveCommentToFirebase(dayKey, d.jobs); else persistState();
     renderDay();
-    const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
-    sendTelegramToAdmins([
-      `📍 <b>Location Shared</b>`,
-      `👤 ${job.location.by}`,
-      `📋 ${job.customer || 'Job ' + (jobIdx + 1)}`,
-      `🗺 ${mapsUrl}`
-    ].join('\n'));
+    const mapsUrl = 'https://maps.google.com/?q=' + lat + ',' + lng;
+    sendJobEventNotification(job, dayKey, jobIdx,
+      currentUser ? currentUser.uid : null, job.location.by || 'Someone', 'location', '🗺 ' + mapsUrl);
   }, () => {
     alert('Location access denied or unavailable. Please allow location permission in your browser.');
   }, { enableHighAccuracy: true, timeout: 10000 });
