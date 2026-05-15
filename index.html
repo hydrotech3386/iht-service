@@ -1619,6 +1619,11 @@ function confirmAssign() {
       assigningReq.desc ? `📝 ${assigningReq.desc}` : null
     ].filter(Boolean).join('\n');
     sendTelegramToUser(assigningReq.submittedByUid, assignLines);
+    firebase.database().ref('notifications/' + assigningReq.submittedByUid).push({
+      type: 'assigned', customer: assigningReq.customer || '', dayKey: date, jobIdx: 0,
+      fromName: 'Admin', preview: 'Scheduled: ' + date + (team.length ? ' · ' + team.join(', ') : ''),
+      ts: Date.now(), read: false
+    }).catch(() => {});
   }
   // Mark request scheduled
   firebase.database().ref('requests/' + assigningReqKey).update({
@@ -3989,7 +3994,7 @@ function renderNotifications() {
       : new Date(n.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     const preview = (n.preview || '').slice(0, 80);
     const dayLabel = n.dayKey ? ' · ' + n.dayKey : '';
-    const icon = n.type === 'request' ? '📋' : n.type === 'photo' ? '📷' : '✍️';
+    const icon = n.type === 'request' ? '📋' : n.type === 'assigned' ? '✅' : n.type === 'photo' ? '📷' : n.type === 'file' ? '📎' : n.type === 'location' ? '📍' : '✍️';
     const onclick = n.type === 'request'
       ? 'goToNotifRequest(\'' + n.key + '\',\'' + (n.reqKey||'') + '\')'
       : 'goToNotifJob(\'' + n.key + '\',\'' + (n.dayKey||'') + '\',' + (n.jobIdx||0) + ')';
