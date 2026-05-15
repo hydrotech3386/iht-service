@@ -517,7 +517,7 @@
   <button class="btn-add" onclick="openModal()">+ Add Job</button>
   <button class="btn-my-jobs" id="btnMyJobs" onclick="toggleMyJobs()">👤 My Jobs</button>
   <button class="btn-search" onclick="openSearch()">🔍 Search</button>
-  <button class="btn-notif" id="btnNotif" onclick="openNotifications()">🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span></button>
+  <button class="btn-notif" id="btnNotif" onclick="openNotifications()">📥<span class="notif-badge" id="notifBadge" style="display:none">0</span></button>
   <button class="btn-request" onclick="openServiceRequest()">📋 New Request</button>
   <button class="btn-requests" id="btnRequests" onclick="openRequestsPanel()">📬 Requests<span class="req-count" id="reqCount" style="display:none">0</span></button>
   <button class="btn-copy" onclick="showWAPreview()">📋 Copy for WhatsApp</button>
@@ -885,7 +885,7 @@
 <div class="modal-bg" id="notifBg" onclick="if(event.target===this)closeNotifications()">
   <div class="modal" style="max-width:440px;max-height:80vh;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0">
-      <h2 style="margin:0">🔔 Notifications</h2>
+      <h2 style="margin:0">📥 Notifications</h2>
       <button class="btn-cancel" onclick="markAllNotifRead()" style="font-size:11px;padding:4px 10px">Mark all read</button>
     </div>
     <div id="notifList" style="overflow-y:auto;flex:1;padding-right:4px;min-height:60px"></div>
