@@ -1491,6 +1491,14 @@ function openRequestsPanel() {
   loadRequests();
 }
 
+function goToScheduledRequest(scheduledTo) {
+  document.getElementById('requestsBg').classList.remove('open');
+  const [y,m,d] = scheduledTo.split('-').map(Number);
+  state.weekStart = getMonday(new Date(y, m-1, d));
+  currentDay = scheduledTo;
+  render();
+}
+
 function filterRequests(btn, filter) {
   currentReqFilter = filter;
   document.querySelectorAll('.req-filter-btn').forEach(b => b.classList.remove('active'));
@@ -1530,6 +1538,8 @@ function loadRequests() {
            <button class="btn-assign" onclick="editRequest('${r._key}')" style="background:#2980b9">✏️ Edit</button>` : '';
       const editBtn = canEdit
         ? `<button class="btn-assign" onclick="editRequest('${r._key}')" style="background:#2980b9">✏️ Edit</button>` : '';
+      const viewJobBtn = (r.status === 'scheduled' && r.scheduledTo && (isSalesman || currentRole === 'admin'))
+        ? `<button class="btn-assign" onclick="goToScheduledRequest('${r.scheduledTo}')" style="background:#27ae60">📅 View Job</button>` : '';
       const delBtn = (currentRole === 'admin' || canEdit)
         ? `<button class="btn-req-del" onclick="deleteRequest('${r._key}')" title="Remove">✕</button>` : '';
       const photoBtn = (currentRole === 'admin' || isOwn)
@@ -1544,7 +1554,7 @@ function loadRequests() {
           ${r.techCount ? `<div style="font-size:11px;color:#6c5ce7;margin:2px 0">👷 Recommended: ${r.techCount} technician${r.techCount>1?'s':''}</div>` : ''}
           <div class="req-meta">${prefHtml}By ${r.salesmanName||r.salesmanEmail||'?'} · ${dateStr}</div>
         </div>
-        <div class="req-actions">${adminActions}${editBtn}${photoBtn}${reqFilesBtn}${delBtn}</div>`;
+        <div class="req-actions">${adminActions}${editBtn}${viewJobBtn}${photoBtn}${reqFilesBtn}${delBtn}</div>`;
       list.appendChild(item);
     });
   }).catch(() => {
