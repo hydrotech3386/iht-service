@@ -1294,6 +1294,7 @@ function setupFirebaseListener() {
         try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
         try { render(); } catch(e) {}
         if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
+          if (commentContext.jobId) { const loc = findJobLocation(commentContext.jobId); if (loc) { commentContext.dayKey = loc.dayKey; commentContext.jobIdx = loc.jobIdx; } }
           const d = getDayData(commentContext.dayKey);
           const job = d.jobs[commentContext.jobIdx];
           if (job) renderCommentList(job.comments || []);
@@ -1552,6 +1553,7 @@ function confirmAssign() {
     salesman: assigningReq.salesmanName || '',
     salesmanUid: assigningReq.submittedByUid || null,
     desc: assigningReq.desc || '',
+    jobId: Date.now().toString(36) + Math.random().toString(36).slice(2),
     status: 'pending',
     comments: [],
     internalBilling: false,
@@ -2355,6 +2357,7 @@ function saveJob() {
     internalBilling: document.getElementById('fInternalBilling').checked,
     ibAmount: document.getElementById('fInternalBilling').checked ? (parseFloat(document.getElementById('fIBAmount').value) || 0) : 0,
     desc: document.getElementById('fDesc').value.trim(),
+    jobId: (existing && existing.jobId) || Date.now().toString(36) + Math.random().toString(36).slice(2),
     status: existing ? (existing.status || 'pending') : 'pending',
     comments: existing ? (existing.comments || []) : []
   };
@@ -2438,11 +2441,21 @@ function fmtCommentTime(ts) {
   return isoDate(d) === today ? `Today ${timeStr}` : `${d.getDate()}/${d.getMonth()+1} ${timeStr}`;
 }
 
+function findJobLocation(jobId) {
+  for (const dk of Object.keys(state.schedule || {})) {
+    const jobs = getDayData(dk).jobs;
+    for (let i = 0; i < jobs.length; i++) {
+      if (jobs[i].jobId === jobId) return { dayKey: dk, jobIdx: i };
+    }
+  }
+  return null;
+}
+
 function openComments(dayKey, jobIdx) {
   const data = getDayData(dayKey);
   const job = data.jobs[jobIdx];
   if (!job) return;
-  commentContext = { dayKey, jobIdx };
+  commentContext = { dayKey, jobIdx, jobId: job.jobId || null };
   document.getElementById('commentTitle').textContent = `💬 ${job.customer || 'Job '+(jobIdx+1)}`;
   renderCommentList(job.comments || []);
   document.getElementById('commentInput').value = '';
@@ -2529,6 +2542,11 @@ function saveEditComment(idx) {
 function addComment() {
   const text = document.getElementById('commentInput').value.trim();
   if (!text || !commentContext) return;
+  // Re-locate job in case it was rescheduled while the modal was open
+  if (commentContext.jobId) {
+    const loc = findJobLocation(commentContext.jobId);
+    if (loc) { commentContext.dayKey = loc.dayKey; commentContext.jobIdx = loc.jobIdx; }
+  }
   const { dayKey, jobIdx } = commentContext;
   const data = getDayData(dayKey);
   const job = data.jobs[jobIdx];
