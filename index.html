@@ -1418,7 +1418,8 @@ function submitServiceRequest() {
       createdAt: Date.now()
     };
     firebase.database().ref('requests').push(req)
-      .then(() => {
+      .then(ref => {
+        const newReqKey = ref.key;
         const lines = [
           `📋 <b>New Service Request</b>`,
           `👤 <b>${req.customer}</b>`,
@@ -1430,6 +1431,21 @@ function submitServiceRequest() {
           `🙋 By: ${req.salesmanName || req.salesmanEmail || 'Unknown'}`
         ].filter(Boolean).join('\n');
         sendTelegramToAdmins(lines);
+        // Notify admins in notification centre
+        const notifData = {
+          type: 'request', reqKey: newReqKey,
+          customer: req.customer,
+          fromName: req.salesmanName || req.salesmanEmail || 'Salesman',
+          preview: req.desc || req.address || (req.preferredDate ? 'Preferred: ' + req.preferredDate : 'New service request'),
+          ts: Date.now(), read: false
+        };
+        firebase.database().ref('users').once('value').then(snap => {
+          snap.forEach(child => {
+            if (child.val().role === 'admin') {
+              firebase.database().ref('notifications/' + child.key).push(notifData).catch(() => {});
+            }
+          });
+        }).catch(() => {});
         document.getElementById('svcReqBg').classList.remove('open');
         alert('Request submitted! Admin will assign it to the schedule.');
       })
@@ -3966,9 +3982,13 @@ function renderNotifications() {
       : new Date(n.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     const preview = (n.preview || '').slice(0, 80);
     const dayLabel = n.dayKey ? ' · ' + n.dayKey : '';
-    return '<div class="notif-item' + (n.read ? '' : ' unread') + '" onclick="goToNotifJob(\'' + n.key + '\',\'' + (n.dayKey||'') + '\',' + (n.jobIdx||0) + ')">'
+    const icon = n.type === 'request' ? '📋' : n.type === 'photo' ? '📷' : '✍️';
+    const onclick = n.type === 'request'
+      ? 'goToNotifRequest(\'' + n.key + '\',\'' + (n.reqKey||'') + '\')'
+      : 'goToNotifJob(\'' + n.key + '\',\'' + (n.dayKey||'') + '\',' + (n.jobIdx||0) + ')';
+    return '<div class="notif-item' + (n.read ? '' : ' unread') + '" onclick="' + onclick + '">'
       + '<div class="notif-customer">' + (n.customer || 'Job') + '</div>'
-      + '<div class="notif-preview">✍️ ' + (n.fromName || 'Someone') + ': ' + preview + '</div>'
+      + '<div class="notif-preview">' + icon + ' ' + (n.fromName || 'Someone') + ': ' + preview + '</div>'
       + '<div class="notif-time">' + timeAgo + dayLabel + '</div>'
       + '</div>';
   }).join('');
@@ -3985,6 +4005,25 @@ function goToNotifJob(key, dayKey, jobIdx) {
     currentDay = dayKey;
     render();
   }
+}
+
+function goToNotifRequest(key, reqKey) {
+  if (currentUser && key) {
+    firebase.database().ref('notifications/' + currentUser.uid + '/' + key).update({ read: true }).catch(() => {});
+  }
+  closeNotifications();
+  if (!reqKey) { openRequestsPanel(); return; }
+  firebase.database().ref('requests/' + reqKey).once('value').then(snap => {
+    const req = snap.val();
+    if (req && req.status === 'scheduled' && req.scheduledTo) {
+      const [y,m,d] = req.scheduledTo.split('-').map(Number);
+      state.weekStart = getMonday(new Date(y, m-1, d));
+      currentDay = req.scheduledTo;
+      render();
+    } else {
+      openRequestsPanel();
+    }
+  }).catch(() => { openRequestsPanel(); });
 }
 
 function markAllNotifRead() {
