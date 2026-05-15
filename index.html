@@ -3153,6 +3153,29 @@ function handlePhotoFile(event) {
     msg.style.color = '#4caf50';
     msg.textContent = '✓ Photo added.';
     setTimeout(() => { msg.textContent = ''; }, 2000);
+    // Send notifications
+    const uploaderUid = currentUser ? currentUser.uid : null;
+    const uploaderName = newPhoto.by || 'Someone';
+    const teamArr = toTeamArr(job.team);
+    const tgMsg = `📷 <b>Photo Attached</b>\n👤 <b>${job.customer || 'Job'}</b>${job.address ? `\n📍 ${job.address}` : ''}\n📅 ${photoContext.dayKey}\n✍️ By: ${uploaderName}`;
+    const notifBase = { type: 'photo', customer: job.customer || '', dayKey: photoContext.dayKey, jobIdx: photoContext.jobIdx, fromName: uploaderName, preview: 'Photo attached', ts: Date.now(), read: false };
+    firebase.database().ref('users').once('value').then(snap => {
+      const sentTg = new Set();
+      snap.forEach(child => {
+        const u = child.val(); const uid = child.key;
+        if (uid === uploaderUid) return;
+        let isRecipient = false;
+        if (u.role === 'admin') isRecipient = true;
+        else if (uid === job.salesmanUid) isRecipient = true;
+        else if (u.role === 'technician' && teamArr.includes(u.name)) isRecipient = true;
+        if (!isRecipient) return;
+        firebase.database().ref('notifications/' + uid).push(notifBase).catch(() => {});
+        if (u.telegramChatId && !sentTg.has(u.telegramChatId)) {
+          sentTg.add(u.telegramChatId);
+          sendTelegram(u.telegramChatId, tgMsg);
+        }
+      });
+    }).catch(() => {});
   }).catch(() => {
     msg.style.color = '#e94560';
     msg.textContent = 'Failed to process image.';
