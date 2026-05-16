@@ -2702,12 +2702,10 @@ function addComment() {
       }
     });
   }).catch(() => {});
-  // Technicians and view-only users write only this day's jobs (no full-state write permission)
-  if (VIEW_ONLY || currentRole === 'view-only' || currentRole === 'technician') {
-    saveCommentToFirebase(dayKey, data.jobs);
-  } else {
-    persistState();
-  }
+  // Always use targeted day write for comments — avoids slow full-state upload (which embeds all photos)
+  // that causes a race where the notification arrives before the comment data does
+  state.lastModified = Date.now();
+  saveCommentToFirebase(dayKey, data.jobs);
 }
 
 function saveCommentToFirebase(dayKey, jobs) {
