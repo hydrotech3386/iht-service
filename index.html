@@ -2711,10 +2711,12 @@ function addComment() {
       }
     });
   }).catch(() => {});
-  // Always use targeted day write for comments — avoids slow full-state upload (which embeds all photos)
-  // that causes a race where the notification arrives before the comment data does
-  state.lastModified = Date.now();
-  saveCommentToFirebase(dayKey, data.jobs);
+  const ts = Date.now();
+  state.lastModified = ts;
+  const updates = {};
+  updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/comments'] = job.comments;
+  updates['lastModified'] = ts;
+  if (fbReady) fbRef.update(updates).catch(e => console.error('Comment save failed', e));
 }
 
 function saveCommentToFirebase(dayKey, jobs) {
@@ -2723,6 +2725,14 @@ function saveCommentToFirebase(dayKey, jobs) {
   updates['schedule/' + dayKey + '/jobs'] = jobs;
   updates['lastModified'] = Date.now();
   fbRef.update(updates).catch(e => console.error('Comment save failed', e));
+}
+
+function saveJobField(dayKey, jobIdx, field, value) {
+  if (!fbReady) return;
+  const updates = {};
+  updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/' + field] = value;
+  updates['lastModified'] = Date.now();
+  fbRef.update(updates).catch(e => console.error('Field save failed', e));
 }
 
 // ---- WhatsApp formatting ----
@@ -3215,7 +3225,7 @@ function handlePhotoFile(event) {
     if (!job) return;
     if (!job.photos) job.photos = [];
     job.photos.push(newPhoto);
-    if (currentRole === 'technician') saveCommentToFirebase(photoContext.dayKey, d.jobs); else persistState();
+    saveJobField(photoContext.dayKey, photoContext.jobIdx, 'photos', job.photos);
     renderPhotoGrid(job.photos);
     renderDay();
     msg.style.color = '#4caf50';
@@ -3245,7 +3255,7 @@ function deletePhoto(idx) {
   const job = d.jobs[photoContext.jobIdx];
   if (!job || !job.photos) return;
   job.photos.splice(idx, 1);
-  if (currentRole === 'technician') saveCommentToFirebase(photoContext.dayKey, d.jobs); else persistState();
+  saveJobField(photoContext.dayKey, photoContext.jobIdx, 'photos', job.photos);
   renderPhotoGrid(job.photos);
   renderDay();
 }
@@ -3365,7 +3375,7 @@ function handleFileUpload(event) {
     if (!job) return;
     if (!job.files) job.files = [];
     job.files.push(newFile);
-    if (currentRole === 'technician') saveCommentToFirebase(fileContext.dayKey, d.jobs); else persistState();
+    saveJobField(fileContext.dayKey, fileContext.jobIdx, 'files', job.files);
     renderFileList(job.files);
     renderDay();
     msg.style.color = '#4caf50';
@@ -3405,7 +3415,7 @@ function deleteFile(idx) {
   const job = d.jobs[fileContext.jobIdx];
   if (!job || !job.files) return;
   job.files.splice(idx, 1);
-  if (currentRole === 'technician') saveCommentToFirebase(fileContext.dayKey, d.jobs); else persistState();
+  saveJobField(fileContext.dayKey, fileContext.jobIdx, 'files', job.files);
   renderFileList(job.files);
   renderDay();
 }
@@ -3516,7 +3526,7 @@ function shareJobLocation(dayKey, jobIdx) {
       uid: currentUser ? currentUser.uid : null,
       ts: Date.now()
     };
-    if (currentRole === 'technician') saveCommentToFirebase(dayKey, d.jobs); else persistState();
+    saveJobField(dayKey, jobIdx, 'location', job.location);
     renderDay();
     const mapsUrl = 'https://maps.google.com/?q=' + lat + ',' + lng;
     sendJobEventNotification(job, dayKey, jobIdx,
