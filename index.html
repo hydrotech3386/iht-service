@@ -2679,6 +2679,7 @@ function addComment() {
   job.comments.push({ text, ts: Date.now(), authorUid, authorName });
   document.getElementById('commentInput').value = '';
   renderCommentList(job.comments);
+  renderDay(); // update comment badge on the job card
   // Send notifications — single users fetch, deduplicate by chatId so each Telegram account gets exactly one message
   const preview = text.slice(0, 200);
   const jobInfo = [
