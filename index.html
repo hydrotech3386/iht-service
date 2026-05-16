@@ -987,8 +987,12 @@ function sendJobEventNotification(job, dayKey, jobIdx, actorUid, actorName, even
       '\n📅 ' + dayKey +
       (extraLine ? '\n' + extraLine : '') +
       '\n✍️ By: ' + actorName;
+    var notifTs = Date.now();
+    var notifKey = 'e_' + (actorUid || 'anon') + '_' + notifTs;
+    if (sentNotifKeys.has(notifKey)) return;
+    sentNotifKeys.add(notifKey);
     var notifData = { type: eventType, customer: job.customer || '', dayKey: dayKey, jobIdx: jobIdx,
-      fromName: actorName, preview: labels[eventType] || 'Job update', ts: Date.now(), read: false };
+      fromName: actorName, preview: labels[eventType] || 'Job update', ts: notifTs, read: false };
     var teamArr = toTeamArr(job.team);
     firebase.database().ref('users').once('value').then(function(snap) {
       var sentTg = new Set();
@@ -997,7 +1001,7 @@ function sendJobEventNotification(job, dayKey, jobIdx, actorUid, actorName, even
         if (uid === actorUid) return;
         var ok = u.role === 'admin' || uid === job.salesmanUid || (u.role === 'technician' && teamArr.includes(u.name));
         if (!ok) return;
-        firebase.database().ref('notifications/' + uid).push(notifData).catch(function(){});
+        firebase.database().ref('notifications/' + uid + '/' + notifKey).set(notifData).catch(function(){});
         if (u.telegramChatId && !sentTg.has(u.telegramChatId)) {
           sentTg.add(u.telegramChatId);
           sendTelegram(u.telegramChatId, tgMsg);
@@ -2684,7 +2688,11 @@ function addComment() {
   const adminMsg = `💬 <b>New Comment</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${authorName}: ${preview}`;
   const jobMsg = `💬 <b>New Comment on Your Job</b>\n👤 <b>${job.customer || 'Job'}</b>\n${jobInfo}\n✍️ ${authorName}: ${preview}`;
   const teamArr = toTeamArr(job.team);
-  const notifBase = { type: 'comment', customer: job.customer || '', dayKey, jobIdx, fromName: authorName, preview, ts: Date.now(), read: false };
+  const notifTs = Date.now();
+  const notifKey = 'c_' + (authorUid || 'anon') + '_' + notifTs;
+  if (sentNotifKeys.has(notifKey)) return;
+  sentNotifKeys.add(notifKey);
+  const notifBase = { type: 'comment', customer: job.customer || '', dayKey, jobIdx, fromName: authorName, preview, ts: notifTs, read: false };
   firebase.database().ref('users').once('value').then(snap => {
     const sentTg = new Set();
     snap.forEach(child => {
@@ -2695,7 +2703,7 @@ function addComment() {
       else if (uid === job.salesmanUid) isRecipient = true;
       else if (u.role === 'technician' && teamArr.includes(u.name)) isRecipient = true;
       if (!isRecipient) return;
-      firebase.database().ref('notifications/' + uid).push(notifBase).catch(() => {});
+      firebase.database().ref('notifications/' + uid + '/' + notifKey).set(notifBase).catch(() => {});
       if (u.telegramChatId && !sentTg.has(u.telegramChatId)) {
         sentTg.add(u.telegramChatId);
         sendTelegram(u.telegramChatId, u.role === 'admin' ? adminMsg : jobMsg);
@@ -3952,6 +3960,7 @@ function goToJob(dayKey) {
 // ---- Notification Centre ----
 let notifRef = null;
 let notifList = [];
+const sentNotifKeys = new Set(); // guard against duplicate notification sends
 
 function setupNotificationListener() {
   if (!currentUser || currentUser.isAnonymous) return;
