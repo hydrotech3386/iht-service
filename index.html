@@ -196,6 +196,16 @@
   .status-badge.in-progress{background:#2a1f00;color:#f39c12;border:1px solid #f39c12}
   .status-badge.completed{background:#0a1f0a;color:#27ae60;border:1px solid #27ae60}
   .status-badge.cancelled{background:#200a0a;color:#e94560;border:1px solid #e94560}
+  /* Status picker popup */
+  #statusPickerMenu{display:none;position:fixed;z-index:9999;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:5px;min-width:150px;box-shadow:0 6px 24px rgba(0,0,0,.7)}
+  #statusPickerMenu.open{display:block}
+  .sp-item{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;transition:background .12s}
+  .sp-item:hover{background:#252545}
+  .sp-item.sp-active{background:#1e1e3a}
+  .sp-item.sp-pending{color:#666}.sp-item.sp-active.sp-pending{color:#999}
+  .sp-item.sp-in-progress{color:#f39c12}
+  .sp-item.sp-completed{color:#27ae60}
+  .sp-item.sp-cancelled{color:#e94560}
 
   /* Role-based permission rules */
   /* View-only */
@@ -873,6 +883,9 @@
     </div>
   </div>
 </div>
+
+<!-- Status picker popup -->
+<div id="statusPickerMenu"></div>
 
 <!-- Search Modal -->
 <div class="modal-bg" id="searchBg" onclick="if(event.target===this)closeSearch()">
@@ -1777,23 +1790,51 @@ function isTechOnJob(job) {
   return toTeamArr(job.team).includes(myName);
 }
 
-function updateJobStatus(idx) {
+let statusPickerTarget = null;
+const STATUS_ICONS = { 'pending': '⏳', 'in-progress': '🔧', 'completed': '✅', 'cancelled': '❌' };
+
+function openStatusPicker(event, idx) {
+  event.stopPropagation();
+  const job = getDayData(currentDay).jobs[idx];
+  if (!job) return;
+  statusPickerTarget = { idx, dayKey: currentDay };
+  const cur = job.status || 'pending';
+  const menu = document.getElementById('statusPickerMenu');
+  menu.innerHTML = STATUS_CYCLE.map(s =>
+    '<div class="sp-item sp-' + s + (s === cur ? ' sp-active' : '') + '" onclick="applyStatusPick(\'' + s + '\')">' +
+    STATUS_ICONS[s] + ' ' + STATUS_LABELS[s] + '</div>'
+  ).join('');
+  const rect = event.currentTarget.getBoundingClientRect();
+  const menuW = 158;
+  let left = rect.left;
+  if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.left = left + 'px';
+  menu.classList.add('open');
+}
+
+function applyStatusPick(newStatus) {
+  document.getElementById('statusPickerMenu').classList.remove('open');
+  if (!statusPickerTarget) return;
+  const { idx, dayKey } = statusPickerTarget;
+  statusPickerTarget = null;
+  setJobStatus(idx, dayKey, newStatus);
+}
+
+function setJobStatus(idx, dayKey, newStatus) {
   if (currentRole !== 'admin' && currentRole !== 'technician') return;
-  const data = getDayData(currentDay);
-  const dayKey = currentDay;
+  const data = getDayData(dayKey);
   const job = data.jobs[idx];
   if (!job) return;
   if (currentRole === 'technician' && !isTechOnJob(job)) return;
-  const cur = job.status || 'pending';
-  const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
-  job.status = next;
-  saveJobField(dayKey, idx, 'status', next);
+  if ((job.status || 'pending') === newStatus) return;
+  job.status = newStatus;
+  saveJobField(dayKey, idx, 'status', newStatus);
   renderDay();
 
   const actorName = (document.getElementById('userName') || {}).textContent || 'Someone';
   const actorUid = currentUser ? currentUser.uid : null;
-  const statusIcons = { 'pending': '⏳', 'in-progress': '🔧', 'completed': '✅', 'cancelled': '❌' };
-  const tgMsg = (statusIcons[next] || '🔄') + ' <b>Job Status: ' + STATUS_LABELS[next] + '</b>\n' +
+  const tgMsg = (STATUS_ICONS[newStatus] || '🔄') + ' <b>Job Status: ' + STATUS_LABELS[newStatus] + '</b>\n' +
     '👤 <b>' + (job.customer || 'Job') + '</b>' +
     (job.address ? '\n📍 ' + job.address : '') +
     '\n📅 ' + dayKey +
@@ -1804,9 +1845,9 @@ function updateJobStatus(idx) {
   if (sentNotifKeys.has(notifKey)) return;
   sentNotifKeys.add(notifKey);
   const notifData = {
-    type: 'status', statusValue: next,
+    type: 'status', statusValue: newStatus,
     customer: job.customer || '', dayKey: dayKey, jobIdx: idx,
-    fromName: actorName, preview: STATUS_LABELS[next], ts: notifTs, read: false
+    fromName: actorName, preview: STATUS_LABELS[newStatus], ts: notifTs, read: false
   };
   const teamArr = toTeamArr(job.team);
   firebase.database().ref('users').once('value').then(function(snap) {
@@ -2190,7 +2231,7 @@ function renderDay() {
         <div class="job-team">${job.team || ''}${showIB ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}</div>
         <div class="job-customer">${job.customer || ''}${job.contact ? ' <span class="contact">'+job.contact+'</span>' : ''}${job.address ? ' '+job.address : ''}${job.salesman ? ' ('+job.salesman+')' : ''}</div>
         ${job.desc ? `<div class="job-desc">${job.desc}</div>` : ''}
-        <span class="status-badge ${status}${canClickStatus?' clickable':''}" ${canClickStatus?`onclick="updateJobStatus(${idx})"`:''}>${statusLabel}</span>
+        <span class="status-badge ${status}${canClickStatus?' clickable':''}" ${canClickStatus?`onclick="openStatusPicker(event,${idx})"`:''}>${statusLabel}</span>
       </div>
       <div class="job-actions">
         <button class="btn-comment" onclick="openComments('${currentDay}',${idx})" title="Comments">💬${cmtCount ? `<span class="comment-badge">${cmtCount}</span>` : ''}</button>
@@ -3890,8 +3931,18 @@ function loadWeek(monKey) {
 }
 
 // Keyboard shortcut: Esc to close modals
+document.addEventListener('click', e => {
+  const menu = document.getElementById('statusPickerMenu');
+  if (menu && menu.classList.contains('open') && !menu.contains(e.target)) {
+    menu.classList.remove('open');
+    statusPickerTarget = null;
+  }
+});
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    document.getElementById('statusPickerMenu').classList.remove('open');
+    statusPickerTarget = null;
     closeModal();
     ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg','jobChangeBg','ibCommentBg','notifBg','searchBg'].forEach(id => {
       document.getElementById(id).classList.remove('open');
