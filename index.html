@@ -1780,23 +1780,49 @@ function isTechOnJob(job) {
 function updateJobStatus(idx) {
   if (currentRole !== 'admin' && currentRole !== 'technician') return;
   const data = getDayData(currentDay);
+  const dayKey = currentDay;
   const job = data.jobs[idx];
   if (!job) return;
   if (currentRole === 'technician' && !isTechOnJob(job)) return;
   const cur = job.status || 'pending';
   const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(cur) + 1) % STATUS_CYCLE.length];
   job.status = next;
-  const statusLines = [
-    `🔄 <b>Job Status: ${STATUS_LABELS[next]}</b>`,
-    `👤 <b>${job.customer || 'Job'}</b>`,
-    job.address ? `📍 ${job.address}` : null,
-    `📅 Date: ${currentDay}`,
-    job.team ? `👷 Team: ${job.team}` : null
-  ].filter(Boolean).join('\n');
-  if (job.salesmanUid) sendTelegramToUser(job.salesmanUid, statusLines);
-  if (currentRole === 'technician') sendTelegramToAdmins(statusLines);
-  persistState();
+  saveJobField(dayKey, idx, 'status', next);
   renderDay();
+
+  const actorName = (document.getElementById('userName') || {}).textContent || 'Someone';
+  const actorUid = currentUser ? currentUser.uid : null;
+  const statusIcons = { 'pending': '⏳', 'in-progress': '🔧', 'completed': '✅', 'cancelled': '❌' };
+  const tgMsg = (statusIcons[next] || '🔄') + ' <b>Job Status: ' + STATUS_LABELS[next] + '</b>\n' +
+    '👤 <b>' + (job.customer || 'Job') + '</b>' +
+    (job.address ? '\n📍 ' + job.address : '') +
+    '\n📅 ' + dayKey +
+    (job.team ? '\n👷 Team: ' + job.team : '') +
+    '\n✍️ By: ' + actorName;
+  const notifTs = Date.now();
+  const notifKey = 's_' + (actorUid || 'anon') + '_' + notifTs;
+  if (sentNotifKeys.has(notifKey)) return;
+  sentNotifKeys.add(notifKey);
+  const notifData = {
+    type: 'status', statusValue: next,
+    customer: job.customer || '', dayKey: dayKey, jobIdx: idx,
+    fromName: actorName, preview: STATUS_LABELS[next], ts: notifTs, read: false
+  };
+  const teamArr = toTeamArr(job.team);
+  firebase.database().ref('users').once('value').then(function(snap) {
+    const sentTg = new Set();
+    snap.forEach(function(child) {
+      const u = child.val(); const uid = child.key;
+      if (uid === actorUid) return;
+      const ok = u.role === 'admin' || uid === job.salesmanUid || (u.role === 'technician' && teamArr.includes(u.name));
+      if (!ok) return;
+      firebase.database().ref('notifications/' + uid + '/' + notifKey).set(notifData).catch(function(){});
+      if (u.telegramChatId && !sentTg.has(u.telegramChatId)) {
+        sentTg.add(u.telegramChatId);
+        sendTelegram(u.telegramChatId, tgMsg);
+      }
+    });
+  }).catch(function(){});
 }
 
 let state = {
@@ -4022,7 +4048,7 @@ function renderNotifications() {
       : new Date(n.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     const preview = (n.preview || '').slice(0, 80);
     const dayLabel = n.dayKey ? ' · ' + n.dayKey : '';
-    const icon = n.type === 'request' ? '📋' : n.type === 'assigned' ? '✅' : n.type === 'photo' ? '📷' : n.type === 'file' ? '📎' : n.type === 'location' ? '📍' : '✍️';
+    const icon = n.type === 'request' ? '📋' : n.type === 'assigned' ? '✅' : n.type === 'photo' ? '📷' : n.type === 'file' ? '📎' : n.type === 'location' ? '📍' : n.type === 'status' ? (n.statusValue === 'completed' ? '✅' : n.statusValue === 'in-progress' ? '🔧' : n.statusValue === 'cancelled' ? '❌' : '⏳') : '✍️';
     const onclick = n.type === 'request'
       ? 'goToNotifRequest(\'' + n.key + '\',\'' + (n.reqKey||'') + '\')'
       : 'goToNotifJob(\'' + n.key + '\',\'' + (n.dayKey||'') + '\',' + (n.jobIdx||0) + ')';
