@@ -3219,9 +3219,12 @@ function openPhotos(dayKey, jobIdx) {
     fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx).once('value').then(snap => {
       const fresh = snap.val();
       if (fresh && fresh.photos) {
-        job.photos = fresh.photos;
-        renderPhotoGrid(fresh.photos);
-        renderDay();
+        const currentJob = getDayData(dayKey).jobs[jobIdx];
+        if (currentJob) {
+          currentJob.photos = fresh.photos;
+          renderPhotoGrid(fresh.photos);
+          renderDay();
+        }
       }
     }).catch(() => {});
   }
@@ -3325,19 +3328,34 @@ function handlePhotoFile(event) {
       });
       return;
     }
-    const d = getDayData(photoContext.dayKey);
-    const job = d.jobs[photoContext.jobIdx];
-    if (!job) return;
-    if (!job.photos) job.photos = [];
-    job.photos.push(newPhoto);
-    saveJobField(photoContext.dayKey, photoContext.jobIdx, 'photos', job.photos);
-    renderPhotoGrid(job.photos);
-    renderDay();
-    msg.style.color = '#4caf50';
-    msg.textContent = '✓ Photo added.';
-    setTimeout(() => { msg.textContent = ''; }, 2000);
-    sendJobEventNotification(job, photoContext.dayKey, photoContext.jobIdx,
-      currentUser ? currentUser.uid : null, newPhoto.by || 'Someone', 'photo');
+    const dayKey = photoContext.dayKey;
+    const jobIdx = photoContext.jobIdx;
+    msg.textContent = 'Saving…';
+    // Read latest photos from Firebase first to avoid overwriting concurrent additions
+    fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
+      const raw = snap.val();
+      const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
+      photos.push(newPhoto);
+      const updates = {};
+      updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
+      updates['lastModified'] = Date.now();
+      return fbRef.update(updates).then(() => {
+        const currentJob = getDayData(dayKey).jobs[jobIdx];
+        if (currentJob) {
+          currentJob.photos = photos;
+          renderPhotoGrid(photos);
+          renderDay();
+          sendJobEventNotification(currentJob, dayKey, jobIdx,
+            currentUser ? currentUser.uid : null, newPhoto.by || 'Someone', 'photo');
+        }
+        msg.style.color = '#4caf50';
+        msg.textContent = '✓ Photo added.';
+        setTimeout(() => { msg.textContent = ''; }, 2000);
+      });
+    }).catch(() => {
+      msg.style.color = '#e94560';
+      msg.textContent = 'Failed to save photo.';
+    });
   }).catch(() => {
     msg.style.color = '#e94560';
     msg.textContent = 'Failed to process image.';
@@ -3356,13 +3374,24 @@ function deletePhoto(idx) {
     }).catch(e => alert('Failed: ' + e.message));
     return;
   }
-  const d = getDayData(photoContext.dayKey);
-  const job = d.jobs[photoContext.jobIdx];
-  if (!job || !job.photos) return;
-  job.photos.splice(idx, 1);
-  saveJobField(photoContext.dayKey, photoContext.jobIdx, 'photos', job.photos);
-  renderPhotoGrid(job.photos);
-  renderDay();
+  const dayKey = photoContext.dayKey;
+  const jobIdx = photoContext.jobIdx;
+  fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
+    const raw = snap.val();
+    const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
+    photos.splice(idx, 1);
+    const updates = {};
+    updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
+    updates['lastModified'] = Date.now();
+    return fbRef.update(updates).then(() => {
+      const currentJob = getDayData(dayKey).jobs[jobIdx];
+      if (currentJob) {
+        currentJob.photos = photos;
+        renderPhotoGrid(photos);
+        renderDay();
+      }
+    });
+  }).catch(e => alert('Failed to delete photo: ' + e.message));
 }
 
 // ---- File Attachments ----
@@ -3384,9 +3413,12 @@ function openFiles(dayKey, jobIdx) {
     fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx).once('value').then(snap => {
       const fresh = snap.val();
       if (fresh && fresh.files) {
-        job.files = fresh.files;
-        renderFileList(fresh.files);
-        renderDay();
+        const currentJob = getDayData(dayKey).jobs[jobIdx];
+        if (currentJob) {
+          currentJob.files = fresh.files;
+          renderFileList(fresh.files);
+          renderDay();
+        }
       }
     }).catch(() => {});
   }
@@ -3485,19 +3517,33 @@ function handleFileUpload(event) {
       }).catch(() => { msg.style.color = '#e94560'; msg.textContent = 'Upload failed.'; });
       return;
     }
-    const d = getDayData(fileContext.dayKey);
-    const job = d.jobs[fileContext.jobIdx];
-    if (!job) return;
-    if (!job.files) job.files = [];
-    job.files.push(newFile);
-    saveJobField(fileContext.dayKey, fileContext.jobIdx, 'files', job.files);
-    renderFileList(job.files);
-    renderDay();
-    msg.style.color = '#4caf50';
-    msg.textContent = '✓ File added.';
-    setTimeout(() => { msg.textContent = ''; }, 2000);
-    sendJobEventNotification(job, fileContext.dayKey, fileContext.jobIdx,
-      currentUser ? currentUser.uid : null, newFile.by || 'Someone', 'file');
+    const dayKey = fileContext.dayKey;
+    const jobIdx = fileContext.jobIdx;
+    msg.textContent = 'Saving…';
+    fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/files').once('value').then(snap => {
+      const raw = snap.val();
+      const files = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
+      files.push(newFile);
+      const updates = {};
+      updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/files'] = files;
+      updates['lastModified'] = Date.now();
+      return fbRef.update(updates).then(() => {
+        const currentJob = getDayData(dayKey).jobs[jobIdx];
+        if (currentJob) {
+          currentJob.files = files;
+          renderFileList(files);
+          renderDay();
+          sendJobEventNotification(currentJob, dayKey, jobIdx,
+            currentUser ? currentUser.uid : null, newFile.by || 'Someone', 'file');
+        }
+        msg.style.color = '#4caf50';
+        msg.textContent = '✓ File added.';
+        setTimeout(() => { msg.textContent = ''; }, 2000);
+      });
+    }).catch(() => {
+      msg.style.color = '#e94560';
+      msg.textContent = 'Upload failed.';
+    });
   };
   reader.onerror = () => { msg.style.color = '#e94560'; msg.textContent = 'Failed to read file.'; };
   reader.readAsDataURL(file);
@@ -3526,13 +3572,24 @@ function deleteFile(idx) {
     }).catch(e => alert('Failed: ' + e.message));
     return;
   }
-  const d = getDayData(fileContext.dayKey);
-  const job = d.jobs[fileContext.jobIdx];
-  if (!job || !job.files) return;
-  job.files.splice(idx, 1);
-  saveJobField(fileContext.dayKey, fileContext.jobIdx, 'files', job.files);
-  renderFileList(job.files);
-  renderDay();
+  const dayKey = fileContext.dayKey;
+  const jobIdx = fileContext.jobIdx;
+  fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/files').once('value').then(snap => {
+    const raw = snap.val();
+    const files = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
+    files.splice(idx, 1);
+    const updates = {};
+    updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/files'] = files;
+    updates['lastModified'] = Date.now();
+    return fbRef.update(updates).then(() => {
+      const currentJob = getDayData(dayKey).jobs[jobIdx];
+      if (currentJob) {
+        currentJob.files = files;
+        renderFileList(files);
+        renderDay();
+      }
+    });
+  }).catch(e => alert('Failed to delete file: ' + e.message));
 }
 
 // ---- Request form file attachments ----
