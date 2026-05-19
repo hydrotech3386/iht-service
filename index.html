@@ -3476,7 +3476,8 @@ function renderFileList(files) {
         <div style="color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${f.name}">${f.name}</div>
         <div style="color:#666;font-size:11px">${f.by || ''}${f.ts ? ' · ' + new Date(f.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
       </div>
-      <button onclick="downloadFile(${i})" style="background:#0f3460;border:none;color:#aaa;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;flex-shrink:0">⬇</button>
+      <button onclick="viewFile(${i})" style="background:#0f3460;border:none;color:#4fc3f7;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:13px;flex-shrink:0" title="View">👁</button>
+      <button onclick="downloadFile(${i})" style="background:#0f3460;border:none;color:#aaa;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px;flex-shrink:0" title="Download">⬇</button>
       ${canDeleteFile(f) ? `<button onclick="deleteFile(${i})" style="background:none;border:none;color:#e94560;cursor:pointer;font-size:16px;padding:4px;flex-shrink:0" title="Remove">✕</button>` : ''}
     </div>`).join('');
 }
@@ -3558,6 +3559,24 @@ function downloadFile(idx) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+function viewFile(idx) {
+  const f = renderedFiles[idx];
+  if (!f || !f.data) return;
+  try {
+    const parts = f.data.split(',');
+    const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'application/octet-stream';
+    const bytes = atob(parts[1]);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    const blob = new Blob([arr], { type: mime });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch(e) {
+    alert('Cannot preview this file.');
+  }
 }
 
 function deleteFile(idx) {
