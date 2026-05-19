@@ -2809,11 +2809,9 @@ function saveCommentToFirebase(dayKey, jobs) {
 
 function saveJobField(dayKey, jobIdx, field, value) {
   if (!fbReady) return;
-  const ts = Date.now();
-  state.lastModified = ts;
   const updates = {};
   updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/' + field] = value;
-  updates['lastModified'] = ts;
+  updates['lastModified'] = Date.now();
   fbRef.update(updates).catch(e => console.error('Field save failed', e));
 }
 
@@ -3223,6 +3221,7 @@ function openPhotos(dayKey, jobIdx) {
       if (fresh && fresh.photos) {
         job.photos = fresh.photos;
         renderPhotoGrid(fresh.photos);
+        renderDay();
       }
     }).catch(() => {});
   }
@@ -3387,6 +3386,7 @@ function openFiles(dayKey, jobIdx) {
       if (fresh && fresh.files) {
         job.files = fresh.files;
         renderFileList(fresh.files);
+        renderDay();
       }
     }).catch(() => {});
   }
