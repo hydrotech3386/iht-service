@@ -2513,6 +2513,7 @@ function saveJob() {
   const data = getDayData(currentDay);
   const existing = editingJob !== null ? data.jobs[editingJob.jobIdx] : null;
   const job = {
+    ...(existing || {}),
     team: getCheckedMembers().join(','),
     customer: document.getElementById('fCustomer').value.trim(),
     contact: document.getElementById('fContact').value.trim(),
@@ -2531,7 +2532,7 @@ function saveJob() {
     data.jobs.push(job);
   }
   closeModal();
-  persistState();
+  saveDayJobs(currentDay);
   renderDay();
   render();
 }
@@ -2580,9 +2581,19 @@ function confirmReschedule() {
   document.getElementById('rescheduleBg').classList.remove('open');
   // Navigate to the new week/day
   const [y,m,d] = newDate.split('-').map(Number);
+  const oldDay = currentDay;
   state.weekStart = getMonday(new Date(y, m-1, d));
   currentDay = newDate;
-  persistState();
+  // Targeted write for both affected days (fast, avoids overwriting concurrent changes)
+  const ts = Date.now();
+  state.lastModified = ts;
+  const updates = {};
+  updates['schedule/' + oldDay + '/jobs'] = getDayData(oldDay).jobs;
+  updates['schedule/' + newDate + '/jobs'] = getDayData(newDate).jobs;
+  updates['lastModified'] = ts;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() }));
+  setSyncStatus('syncing');
+  if (fbReady) fbRef.update(updates).then(() => setSyncStatus('synced')).catch(() => setSyncStatus('offline'));
   render();
 }
 
@@ -2590,7 +2601,7 @@ function deleteJob(idx) {
   if (!confirm('Delete this job?')) return;
   const data = getDayData(currentDay);
   data.jobs.splice(idx, 1);
-  persistState();
+  saveDayJobs(currentDay);
   renderDay();
   render();
 }
@@ -2600,7 +2611,7 @@ function moveJob(idx, dir) {
   const newIdx = idx + dir;
   if (newIdx < 0 || newIdx >= data.jobs.length) return;
   [data.jobs[idx], data.jobs[newIdx]] = [data.jobs[newIdx], data.jobs[idx]];
-  persistState();
+  saveDayJobs(currentDay);
   renderDay();
 }
 
@@ -2788,18 +2799,37 @@ function addComment() {
 
 function saveCommentToFirebase(dayKey, jobs) {
   if (!fbReady) return;
+  const ts = Date.now();
+  state.lastModified = ts;
   const updates = {};
   updates['schedule/' + dayKey + '/jobs'] = jobs;
-  updates['lastModified'] = Date.now();
+  updates['lastModified'] = ts;
   fbRef.update(updates).catch(e => console.error('Comment save failed', e));
 }
 
 function saveJobField(dayKey, jobIdx, field, value) {
   if (!fbReady) return;
+  const ts = Date.now();
+  state.lastModified = ts;
   const updates = {};
   updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/' + field] = value;
-  updates['lastModified'] = Date.now();
+  updates['lastModified'] = ts;
   fbRef.update(updates).catch(e => console.error('Field save failed', e));
+}
+
+function saveDayJobs(dayKey) {
+  if (!fbReady) return;
+  const ts = Date.now();
+  state.lastModified = ts;
+  const updates = {};
+  updates['schedule/' + dayKey + '/jobs'] = getDayData(dayKey).jobs;
+  updates['lastModified'] = ts;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() }));
+  setSyncStatus('syncing');
+  fbRef.update(updates)
+    .then(() => setSyncStatus('synced'))
+    .catch(() => setSyncStatus('offline'));
+  updateIBPendingBadge();
 }
 
 // ---- WhatsApp formatting ----
