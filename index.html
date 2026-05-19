@@ -3217,6 +3217,15 @@ function openPhotos(dayKey, jobIdx) {
   document.getElementById('photoUploadMsg').textContent = '';
   renderPhotoGrid(job.photos || []);
   document.getElementById('photoBg').classList.add('open');
+  if (fbReady) {
+    fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx).once('value').then(snap => {
+      const fresh = snap.val();
+      if (fresh && fresh.photos) {
+        job.photos = fresh.photos;
+        renderPhotoGrid(fresh.photos);
+      }
+    }).catch(() => {});
+  }
 }
 
 function closePhotoBg() {
@@ -3372,6 +3381,15 @@ function openFiles(dayKey, jobIdx) {
   document.getElementById('fileUploadMsg').textContent = '';
   renderFileList(job.files || []);
   document.getElementById('filesBg').classList.add('open');
+  if (fbReady) {
+    fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx).once('value').then(snap => {
+      const fresh = snap.val();
+      if (fresh && fresh.files) {
+        job.files = fresh.files;
+        renderFileList(fresh.files);
+      }
+    }).catch(() => {});
+  }
 }
 
 function openFilesForRequest(reqKey) {
