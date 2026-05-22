@@ -3514,6 +3514,39 @@ function triggerFileUpload() {
 function handleFileUpload(event) {
   const file = event.target.files[0];
   if (!file || !fileContext) return;
+  // If user selected an image via the files dialog, save it as a photo instead
+  if (file.type.startsWith('image/') && fileContext.mode !== 'request') {
+    const msg = document.getElementById('fileUploadMsg');
+    msg.style.color = '#aaa';
+    msg.textContent = 'Saving as photo…';
+    const dayKey = fileContext.dayKey;
+    const jobIdx = fileContext.jobIdx;
+    const by = document.getElementById('userName').textContent || '';
+    compressImage(file, 1200, 0.75).then(url => {
+      const newPhoto = { url, ts: Date.now(), by, uploadedByUid: currentUser ? currentUser.uid : null };
+      fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
+        const raw = snap.val();
+        const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
+        photos.push(newPhoto);
+        const updates = {};
+        updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
+        updates['lastModified'] = Date.now();
+        return fbRef.update(updates).then(() => {
+          const currentJob = getDayData(dayKey).jobs[jobIdx];
+          if (currentJob) {
+            currentJob.photos = photos;
+            renderDay();
+            sendJobEventNotification(currentJob, dayKey, jobIdx,
+              currentUser ? currentUser.uid : null, by || 'Someone', 'photo');
+          }
+          msg.style.color = '#4caf50';
+          msg.textContent = '✓ Saved to Photos.';
+          setTimeout(() => { msg.textContent = ''; }, 3000);
+        });
+      }).catch(() => { msg.style.color = '#e94560'; msg.textContent = 'Failed to save photo.'; });
+    });
+    return;
+  }
   const msg = document.getElementById('fileUploadMsg');
   if (file.size > 5 * 1024 * 1024) {
     msg.style.color = '#e94560';
