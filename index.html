@@ -2128,7 +2128,7 @@ function setAbsence(name, type) {
   } else {
     data.absence[name] = type;
   }
-  saveDayJobs(currentDay);
+  saveDayField(currentDay, 'absence', data.absence);
   renderLeaveRow();
   render();
 }
@@ -2288,7 +2288,7 @@ function renderDay() {
 function toggleHoliday() {
   const data = getDayData(currentDay);
   data.holiday = document.getElementById('holidayCheck').checked;
-  saveDayJobs(currentDay);
+  saveDayField(currentDay, 'holiday', data.holiday);
   renderDay();
   render(); // update tab color
 }
@@ -2296,7 +2296,7 @@ function toggleHoliday() {
 function saveHolidayLabel() {
   const data = getDayData(currentDay);
   data.holidayLabel = document.getElementById('holidayLabel').value;
-  saveDayJobs(currentDay);
+  saveDayField(currentDay, 'holidayLabel', data.holidayLabel);
   render();
 }
 
@@ -2701,7 +2701,7 @@ function deleteComment(idx) {
   if (!job) return;
   job.comments.splice(idx, 1);
   renderCommentList(job.comments);
-  saveCommentToFirebase(dayKey, data.jobs);
+  saveJobField(dayKey, jobIdx, 'comments', job.comments);
 }
 
 function editComment(idx) {
@@ -2738,7 +2738,7 @@ function saveEditComment(idx) {
   job.comments[idx].text = text;
   job.comments[idx].edited = true;
   renderCommentList(job.comments);
-  saveCommentToFirebase(dayKey, data.jobs);
+  saveJobField(dayKey, jobIdx, 'comments', job.comments);
 }
 
 function addComment() {
@@ -2822,12 +2822,8 @@ function saveDayJobs(dayKey) {
   if (!fbReady) return;
   const ts = Date.now();
   state.lastModified = ts;
-  const dayData = getDayData(dayKey);
   const updates = {};
-  updates['schedule/' + dayKey + '/jobs'] = dayData.jobs;
-  updates['schedule/' + dayKey + '/absence'] = dayData.absence || {};
-  updates['schedule/' + dayKey + '/holiday'] = dayData.holiday || false;
-  updates['schedule/' + dayKey + '/holidayLabel'] = dayData.holidayLabel || '';
+  updates['schedule/' + dayKey + '/jobs'] = getDayData(dayKey).jobs;
   updates['lastModified'] = ts;
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() }));
   setSyncStatus('syncing');
@@ -2835,6 +2831,17 @@ function saveDayJobs(dayKey) {
     .then(() => setSyncStatus('synced'))
     .catch(() => setSyncStatus('offline'));
   updateIBPendingBadge();
+}
+
+function saveDayField(dayKey, field, value) {
+  if (!fbReady) return;
+  const ts = Date.now();
+  state.lastModified = ts;
+  const updates = {};
+  updates['schedule/' + dayKey + '/' + field] = value;
+  updates['lastModified'] = ts;
+  fbRef.update(updates).catch(e => console.error('Day field save failed', e));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() })); } catch(e) {}
 }
 
 // ---- WhatsApp formatting ----
@@ -3160,10 +3167,19 @@ function acceptIBJob(dateKey, jobIdx) {
   if (!confirm('Mark this job as accepted?')) return;
   const day = getDayData(dateKey);
   if (!day.jobs[jobIdx]) return;
+  const ts = Date.now();
+  const by = currentUser ? currentUser.uid : '';
   day.jobs[jobIdx].ibAccepted = true;
-  day.jobs[jobIdx].ibAcceptedAt = Date.now();
-  day.jobs[jobIdx].ibAcceptedBy = currentUser ? currentUser.uid : '';
-  saveDayJobs(dateKey);
+  day.jobs[jobIdx].ibAcceptedAt = ts;
+  day.jobs[jobIdx].ibAcceptedBy = by;
+  if (fbReady) {
+    const updates = {};
+    updates['schedule/' + dateKey + '/jobs/' + jobIdx + '/ibAccepted'] = true;
+    updates['schedule/' + dateKey + '/jobs/' + jobIdx + '/ibAcceptedAt'] = ts;
+    updates['schedule/' + dateKey + '/jobs/' + jobIdx + '/ibAcceptedBy'] = by;
+    updates['lastModified'] = Date.now();
+    fbRef.update(updates).catch(e => console.error('IB accept failed', e));
+  }
   renderSummary();
 }
 
@@ -3182,12 +3198,13 @@ function submitIBComment() {
   const day = getDayData(dateKey);
   if (!day.jobs[jobIdx]) return;
   const isAdmin = ibCommentContext.isAdmin;
+  const ibField = isAdmin ? 'ibAdminComment' : 'ibSalesmanComment';
   if (isAdmin) {
     day.jobs[jobIdx].ibAdminComment = text;
   } else {
     day.jobs[jobIdx].ibSalesmanComment = text;
   }
-  saveDayJobs(dateKey);
+  saveJobField(dateKey, jobIdx, ibField, text);
   const job = day.jobs[jobIdx];
   const myName = currentScheduleName || (document.getElementById('userName') ? document.getElementById('userName').textContent : '');
   const d = new Date(dateKey);
