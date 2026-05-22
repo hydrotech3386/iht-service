@@ -1338,46 +1338,50 @@ function setupFirebaseListener() {
   }
   if (VIEW_ONLY || currentRole === 'view-only') {
     fbRef.on('value', snapshot => {
-      const fbData = snapshot.val();
-      if (fbData) {
-        try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
-        try { render(); } catch(e) {}
-        if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
-          if (commentContext.jobId) { const loc = findJobLocation(commentContext.jobId); if (loc) { commentContext.dayKey = loc.dayKey; commentContext.jobIdx = loc.jobIdx; } }
-          const d = getDayData(commentContext.dayKey);
-          const job = d.jobs[commentContext.jobIdx];
-          if (job) renderCommentList(job.comments || []);
-        }
-      }
-      setSyncStatus('synced');
-    }, () => setSyncStatus('offline'));
-  } else {
-    fbRef.on('value', snapshot => {
-      const fbData = snapshot.val();
-      if (fbData) {
-        const localTs = state.lastModified || 0;
-        const fbTs = fbData.lastModified || 0;
-        if (fbTs > localTs) {
-          const oldCounts = isFirstSchedSnap ? null : snapshotCommentCounts();
-          const savedWeekStart = state.weekStart;
-          const savedCurrentDay = currentDay;
+      try {
+        const fbData = snapshot.val();
+        if (fbData) {
           try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
-          state.weekStart = savedWeekStart;
-          currentDay = savedCurrentDay;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(fbData));
-          if (isFirstSchedSnap) { isFirstSchedSnap = false; }
-          else {
-            if (oldCounts) checkNewComments(oldCounts);
-          }
           try { render(); } catch(e) {}
           if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
+            if (commentContext.jobId) { const loc = findJobLocation(commentContext.jobId); if (loc) { commentContext.dayKey = loc.dayKey; commentContext.jobIdx = loc.jobIdx; } }
             const d = getDayData(commentContext.dayKey);
             const job = d.jobs[commentContext.jobIdx];
             if (job) renderCommentList(job.comments || []);
           }
-        } else if (isFirstSchedSnap) { isFirstSchedSnap = false; }
-      }
-      setSyncStatus('synced');
+        }
+      } catch(e) { console.error('FB listener error:', e); }
+      finally { setSyncStatus('synced'); }
+    }, () => setSyncStatus('offline'));
+  } else {
+    fbRef.on('value', snapshot => {
+      try {
+        const fbData = snapshot.val();
+        if (fbData) {
+          const localTs = state.lastModified || 0;
+          const fbTs = fbData.lastModified || 0;
+          if (fbTs > localTs) {
+            const oldCounts = isFirstSchedSnap ? null : snapshotCommentCounts();
+            const savedWeekStart = state.weekStart;
+            const savedCurrentDay = currentDay;
+            try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
+            state.weekStart = savedWeekStart;
+            currentDay = savedCurrentDay;
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(fbData)); } catch(e) {}
+            if (isFirstSchedSnap) { isFirstSchedSnap = false; }
+            else {
+              if (oldCounts) checkNewComments(oldCounts);
+            }
+            try { render(); } catch(e) {}
+            if (commentContext && document.getElementById('commentBg').classList.contains('open')) {
+              const d = getDayData(commentContext.dayKey);
+              const job = d.jobs[commentContext.jobIdx];
+              if (job) renderCommentList(job.comments || []);
+            }
+          } else if (isFirstSchedSnap) { isFirstSchedSnap = false; }
+        }
+      } catch(e) { console.error('FB listener error:', e); }
+      finally { setSyncStatus('synced'); }
     }, () => setSyncStatus('offline'));
   }
 }
