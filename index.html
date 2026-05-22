@@ -1806,9 +1806,12 @@ function openStatusPicker(event, idx) {
   ).join('');
   const rect = event.currentTarget.getBoundingClientRect();
   const menuW = 158;
+  const menuH = 170;
   let left = rect.left;
   if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
-  menu.style.top = (rect.bottom + 4) + 'px';
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const top = spaceBelow >= menuH + 4 ? rect.bottom + 4 : rect.top - menuH - 4;
+  menu.style.top = top + 'px';
   menu.style.left = left + 'px';
   menu.classList.add('open');
 }
