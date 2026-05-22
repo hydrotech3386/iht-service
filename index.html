@@ -1663,7 +1663,7 @@ function confirmAssign() {
   state.weekStart = getMonday(new Date(y, m-1, d));
   currentDay = date;
   document.getElementById('assignBg').classList.remove('open');
-  persistState();
+  saveDayJobs(date);
   render();
 }
 
@@ -2038,7 +2038,7 @@ function changeWeek(dir) {
   state.weekStart = d;
   currentDay = isoDate(getDayDate(state.weekStart, 0));
   render();
-  persistState();
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() })); } catch(e) {}
 }
 
 function getDayData(dayKey) {
@@ -2125,7 +2125,7 @@ function setAbsence(name, type) {
   } else {
     data.absence[name] = type;
   }
-  persistState();
+  saveDayJobs(currentDay);
   renderLeaveRow();
   render();
 }
@@ -2212,7 +2212,7 @@ function renderDay() {
         delBtn.className = 'btn-edit-job';
         delBtn.title = 'Remove marker';
         delBtn.textContent = '✕';
-        delBtn.onclick = () => { getDayData(currentDay).jobs.splice(idx,1); persistState(); renderDay(); render(); };
+        delBtn.onclick = () => { getDayData(currentDay).jobs.splice(idx,1); saveDayJobs(currentDay); renderDay(); render(); };
         card.querySelector('.job-actions').appendChild(delBtn);
       }
       list.appendChild(card);
@@ -2285,7 +2285,7 @@ function renderDay() {
 function toggleHoliday() {
   const data = getDayData(currentDay);
   data.holiday = document.getElementById('holidayCheck').checked;
-  persistState();
+  saveDayJobs(currentDay);
   renderDay();
   render(); // update tab color
 }
@@ -2293,7 +2293,7 @@ function toggleHoliday() {
 function saveHolidayLabel() {
   const data = getDayData(currentDay);
   data.holidayLabel = document.getElementById('holidayLabel').value;
-  persistState();
+  saveDayJobs(currentDay);
   render();
 }
 
@@ -2698,7 +2698,7 @@ function deleteComment(idx) {
   if (!job) return;
   job.comments.splice(idx, 1);
   renderCommentList(job.comments);
-  persistState();
+  saveCommentToFirebase(dayKey, data.jobs);
 }
 
 function editComment(idx) {
@@ -2735,7 +2735,7 @@ function saveEditComment(idx) {
   job.comments[idx].text = text;
   job.comments[idx].edited = true;
   renderCommentList(job.comments);
-  persistState();
+  saveCommentToFirebase(dayKey, data.jobs);
 }
 
 function addComment() {
@@ -2819,8 +2819,12 @@ function saveDayJobs(dayKey) {
   if (!fbReady) return;
   const ts = Date.now();
   state.lastModified = ts;
+  const dayData = getDayData(dayKey);
   const updates = {};
-  updates['schedule/' + dayKey + '/jobs'] = getDayData(dayKey).jobs;
+  updates['schedule/' + dayKey + '/jobs'] = dayData.jobs;
+  updates['schedule/' + dayKey + '/absence'] = dayData.absence || {};
+  updates['schedule/' + dayKey + '/holiday'] = dayData.holiday || false;
+  updates['schedule/' + dayKey + '/holidayLabel'] = dayData.holidayLabel || '';
   updates['lastModified'] = ts;
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() }));
   setSyncStatus('syncing');
@@ -3156,7 +3160,7 @@ function acceptIBJob(dateKey, jobIdx) {
   day.jobs[jobIdx].ibAccepted = true;
   day.jobs[jobIdx].ibAcceptedAt = Date.now();
   day.jobs[jobIdx].ibAcceptedBy = currentUser ? currentUser.uid : '';
-  persistState();
+  saveDayJobs(dateKey);
   renderSummary();
 }
 
@@ -3180,7 +3184,7 @@ function submitIBComment() {
   } else {
     day.jobs[jobIdx].ibSalesmanComment = text;
   }
-  persistState();
+  saveDayJobs(dateKey);
   const job = day.jobs[jobIdx];
   const myName = currentScheduleName || (document.getElementById('userName') ? document.getElementById('userName').textContent : '');
   const d = new Date(dateKey);
@@ -3732,7 +3736,7 @@ function clearJobLocation(dayKey, jobIdx) {
   const job = d.jobs[jobIdx];
   if (!job) return;
   delete job.location;
-  persistState();
+  saveJobField(dayKey, jobIdx, 'location', null);
   renderDay();
 }
 
