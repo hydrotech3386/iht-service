@@ -1367,7 +1367,7 @@ function setupFirebaseListener() {
             try { applyStateData(fbData); } catch(e) { console.error('FB state error:', e); }
             state.weekStart = savedWeekStart;
             currentDay = savedCurrentDay;
-            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(fbData)); } catch(e) {}
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stateForStorage(fbData))); } catch(e) {}
             if (isFirstSchedSnap) { isFirstSchedSnap = false; }
             else {
               if (oldCounts) checkNewComments(oldCounts);
@@ -2045,7 +2045,7 @@ function changeWeek(dir) {
   state.weekStart = d;
   currentDay = isoDate(getDayDate(state.weekStart, 0));
   render();
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() })); } catch(e) {}
+  saveToLocalStorage();
 }
 
 function getDayData(dayKey) {
@@ -2598,7 +2598,7 @@ function confirmReschedule() {
   updates['schedule/' + oldDay + '/jobs'] = getDayData(oldDay).jobs;
   updates['schedule/' + newDate + '/jobs'] = getDayData(newDate).jobs;
   updates['lastModified'] = ts;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() })); } catch(e) {}
+  saveToLocalStorage();
   setSyncStatus('syncing');
   if (fbReady) fbRef.update(updates).then(() => setSyncStatus('synced')).catch(() => setSyncStatus('offline'));
   render();
@@ -2829,7 +2829,7 @@ function saveDayJobs(dayKey) {
   const updates = {};
   updates['schedule/' + dayKey + '/jobs'] = getDayData(dayKey).jobs;
   updates['lastModified'] = ts;
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() })); } catch(e) {}
+  saveToLocalStorage();
   setSyncStatus('syncing');
   fbRef.update(updates)
     .then(() => setSyncStatus('synced'))
@@ -2845,7 +2845,7 @@ function saveDayField(dayKey, field, value) {
   updates['schedule/' + dayKey + '/' + field] = value;
   updates['lastModified'] = ts;
   fbRef.update(updates).catch(e => console.error('Day field save failed', e));
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() })); } catch(e) {}
+  saveToLocalStorage();
 }
 
 // ---- WhatsApp formatting ----
@@ -3856,6 +3856,32 @@ function initFirebase() {
   } catch(e) { console.warn('Firebase init failed', e); }
 }
 
+function stateForStorage(src) {
+  const s = src ? { ...src } : { ...state, weekStart: state.weekStart.toISOString() };
+  if (!src) s.weekStart = state.weekStart.toISOString();
+  if (s.schedule && typeof s.schedule === 'object') {
+    const sched = {};
+    Object.keys(s.schedule).forEach(dayKey => {
+      const day = s.schedule[dayKey];
+      if (!day || typeof day !== 'object') { sched[dayKey] = day; return; }
+      sched[dayKey] = {
+        ...day,
+        jobs: (Array.isArray(day.jobs) ? day.jobs : Object.values(day.jobs || {})).map(job => {
+          if (!job) return job;
+          const { photos, files, ...rest } = job;
+          return rest;
+        })
+      };
+    });
+    s.schedule = sched;
+  }
+  return s;
+}
+
+function saveToLocalStorage() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stateForStorage())); } catch(e) {}
+}
+
 function setSyncStatus(status) {
   const dot = document.getElementById('syncDot');
   const lbl = document.getElementById('syncLabel');
@@ -3869,7 +3895,7 @@ function persistState() {
   if (VIEW_ONLY || currentRole === 'view-only' || currentRole === 'pending') return;
   state.lastModified = Date.now();
   const toSave = { ...state, weekStart: state.weekStart.toISOString() };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+  saveToLocalStorage();
   if (fbReady) {
     setSyncStatus('syncing');
     fbRef.set(toSave)
