@@ -2598,7 +2598,7 @@ function confirmReschedule() {
   updates['schedule/' + oldDay + '/jobs'] = getDayData(oldDay).jobs;
   updates['schedule/' + newDate + '/jobs'] = getDayData(newDate).jobs;
   updates['lastModified'] = ts;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() }));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() })); } catch(e) {}
   setSyncStatus('syncing');
   if (fbReady) fbRef.update(updates).then(() => setSyncStatus('synced')).catch(() => setSyncStatus('offline'));
   render();
@@ -2829,7 +2829,7 @@ function saveDayJobs(dayKey) {
   const updates = {};
   updates['schedule/' + dayKey + '/jobs'] = getDayData(dayKey).jobs;
   updates['lastModified'] = ts;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() }));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, weekStart: state.weekStart.toISOString() })); } catch(e) {}
   setSyncStatus('syncing');
   fbRef.update(updates)
     .then(() => setSyncStatus('synced'))
