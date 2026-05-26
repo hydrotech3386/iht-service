@@ -1378,7 +1378,28 @@ function setupFirebaseListener() {
               const job = d.jobs[commentContext.jobIdx];
               if (job) renderCommentList(job.comments || []);
             }
-          } else if (isFirstSchedSnap) { isFirstSchedSnap = false; }
+          } else {
+            if (isFirstSchedSnap) { isFirstSchedSnap = false; }
+            // Even when not applying full state, always sync photos/files so badges stay current
+            if (fbData.schedule && state.schedule) {
+              let photosChanged = false;
+              for (let _i = 0; _i < 6; _i++) {
+                const _dk = isoDate(getDayDate(state.weekStart, _i));
+                const _fbDay = fbData.schedule[_dk];
+                if (!_fbDay || !_fbDay.jobs || !state.schedule[_dk]) continue;
+                const _fbJobs = Array.isArray(_fbDay.jobs) ? _fbDay.jobs : Object.values(_fbDay.jobs);
+                const _localJobs = getDayData(_dk).jobs;
+                _fbJobs.forEach((_fbJob, _idx) => {
+                  if (!_fbJob || !_localJobs[_idx]) return;
+                  const _p = _fbJob.photos ? (Array.isArray(_fbJob.photos) ? _fbJob.photos : Object.values(_fbJob.photos)) : [];
+                  const _f = _fbJob.files  ? (Array.isArray(_fbJob.files)  ? _fbJob.files  : Object.values(_fbJob.files))  : [];
+                  if ((_localJobs[_idx].photos || []).length !== _p.length) { _localJobs[_idx].photos = _p; photosChanged = true; }
+                  if ((_localJobs[_idx].files  || []).length !== _f.length) { _localJobs[_idx].files  = _f; photosChanged = true; }
+                });
+              }
+              if (photosChanged) try { renderDay(); } catch(e) {}
+            }
+          }
         }
       } catch(e) { console.error('FB listener error:', e); }
       finally { setSyncStatus('synced'); }
