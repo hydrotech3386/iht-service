@@ -467,6 +467,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -3340,7 +3341,7 @@ function compressImage(file, maxPx, quality) {
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
       };
       img.src = e.target.result;
     };
@@ -3353,20 +3354,54 @@ function handlePhotoFile(event) {
   if (!file || !photoContext) return;
   const msg = document.getElementById('photoUploadMsg');
   msg.style.color = '#aaa';
-  msg.textContent = 'Compressing…';
-  compressImage(file, 1200, 0.75).then(url => {
-    const newPhoto = {
-      url,
-      ts: Date.now(),
-      by: document.getElementById('userName').textContent || '',
-      uploadedByUid: currentUser ? currentUser.uid : null
-    };
+  msg.textContent = 'Uploading photo…';
+  const by = document.getElementById('userName').textContent || '';
+  compressImage(file, 1200, 0.75).then(blob => {
+    const ts = Date.now();
     if (photoContext.mode === 'request') {
-      firebase.database().ref('requests/' + photoContext.reqKey + '/photos').once('value').then(snap => {
-        const photos = snap.val() || [];
+      // For requests, upload to Storage then save URL
+      const storagePath = `request-photos/${photoContext.reqKey}/${ts}.jpg`;
+      const storageRef = fbStorage.ref(storagePath);
+      return storageRef.put(blob).then(() => storageRef.getDownloadURL()).then(url => {
+        const newPhoto = { url, ts, by, uploadedByUid: currentUser ? currentUser.uid : null, storagePath };
+        firebase.database().ref('requests/' + photoContext.reqKey + '/photos').once('value').then(snap => {
+          const photos = snap.val() || [];
+          photos.push(newPhoto);
+          return firebase.database().ref('requests/' + photoContext.reqKey + '/photos').set(photos).then(() => {
+            renderPhotoGrid(photos);
+            msg.style.color = '#4caf50';
+            msg.textContent = '✓ Photo added.';
+            setTimeout(() => { msg.textContent = ''; }, 2000);
+          });
+        }).catch(() => {
+          msg.style.color = '#e94560';
+          msg.textContent = 'Failed to save photo.';
+        });
+      });
+    }
+    const dayKey = photoContext.dayKey;
+    const jobIdx = photoContext.jobIdx;
+    msg.textContent = 'Uploading…';
+    const storagePath = `job-photos/${dayKey}_${jobIdx}/${ts}.jpg`;
+    const storageRef = fbStorage.ref(storagePath);
+    return storageRef.put(blob).then(() => storageRef.getDownloadURL()).then(url => {
+      const newPhoto = { url, ts, by, uploadedByUid: currentUser ? currentUser.uid : null, storagePath };
+      fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
+        const raw = snap.val();
+        const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
         photos.push(newPhoto);
-        return firebase.database().ref('requests/' + photoContext.reqKey + '/photos').set(photos).then(() => {
-          renderPhotoGrid(photos);
+        const updates = {};
+        updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
+        updates['lastModified'] = Date.now();
+        return fbRef.update(updates).then(() => {
+          const currentJob = getDayData(dayKey).jobs[jobIdx];
+          if (currentJob) {
+            currentJob.photos = photos;
+            renderPhotoGrid(photos);
+            renderDay();
+            sendJobEventNotification(currentJob, dayKey, jobIdx,
+              currentUser ? currentUser.uid : null, by || 'Someone', 'photo');
+          }
           msg.style.color = '#4caf50';
           msg.textContent = '✓ Photo added.';
           setTimeout(() => { msg.textContent = ''; }, 2000);
@@ -3375,39 +3410,11 @@ function handlePhotoFile(event) {
         msg.style.color = '#e94560';
         msg.textContent = 'Failed to save photo.';
       });
-      return;
-    }
-    const dayKey = photoContext.dayKey;
-    const jobIdx = photoContext.jobIdx;
-    msg.textContent = 'Saving…';
-    // Read latest photos from Firebase first to avoid overwriting concurrent additions
-    fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
-      const raw = snap.val();
-      const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
-      photos.push(newPhoto);
-      const updates = {};
-      updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
-      updates['lastModified'] = Date.now();
-      return fbRef.update(updates).then(() => {
-        const currentJob = getDayData(dayKey).jobs[jobIdx];
-        if (currentJob) {
-          currentJob.photos = photos;
-          renderPhotoGrid(photos);
-          renderDay();
-          sendJobEventNotification(currentJob, dayKey, jobIdx,
-            currentUser ? currentUser.uid : null, newPhoto.by || 'Someone', 'photo');
-        }
-        msg.style.color = '#4caf50';
-        msg.textContent = '✓ Photo added.';
-        setTimeout(() => { msg.textContent = ''; }, 2000);
-      });
-    }).catch(() => {
-      msg.style.color = '#e94560';
-      msg.textContent = 'Failed to save photo.';
     });
-  }).catch(() => {
+  }).catch(err => {
+    console.error('Photo upload failed', err);
     msg.style.color = '#e94560';
-    msg.textContent = 'Failed to process image.';
+    msg.textContent = 'Upload failed.';
   });
 }
 
@@ -3428,11 +3435,14 @@ function deletePhoto(idx) {
   fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
     const raw = snap.val();
     const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
-    photos.splice(idx, 1);
+    const removed = photos.splice(idx, 1)[0];
     const updates = {};
     updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
     updates['lastModified'] = Date.now();
     return fbRef.update(updates).then(() => {
+      if (removed && removed.storagePath && fbStorage) {
+        fbStorage.ref(removed.storagePath).delete().catch(e => console.warn('Storage delete failed', e));
+      }
       const currentJob = getDayData(dayKey).jobs[jobIdx];
       if (currentJob) {
         currentJob.photos = photos;
@@ -3547,50 +3557,52 @@ function handleFileUpload(event) {
     const dayKey = fileContext.dayKey;
     const jobIdx = fileContext.jobIdx;
     const by = document.getElementById('userName').textContent || '';
-    compressImage(file, 1200, 0.75).then(url => {
-      const newPhoto = { url, ts: Date.now(), by, uploadedByUid: currentUser ? currentUser.uid : null };
-      fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
-        const raw = snap.val();
-        const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
-        photos.push(newPhoto);
-        const updates = {};
-        updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
-        updates['lastModified'] = Date.now();
-        return fbRef.update(updates).then(() => {
-          const currentJob = getDayData(dayKey).jobs[jobIdx];
-          if (currentJob) {
-            currentJob.photos = photos;
-            renderDay();
-            sendJobEventNotification(currentJob, dayKey, jobIdx,
-              currentUser ? currentUser.uid : null, by || 'Someone', 'photo');
-          }
-          msg.style.color = '#4caf50';
-          msg.textContent = '✓ Saved to Photos.';
-          setTimeout(() => { msg.textContent = ''; }, 3000);
-        });
-      }).catch(() => { msg.style.color = '#e94560'; msg.textContent = 'Failed to save photo.'; });
-    });
+    compressImage(file, 1200, 0.75).then(blob => {
+      const ts = Date.now();
+      const storagePath = `job-photos/${dayKey}_${jobIdx}/${ts}.jpg`;
+      const storageRef = fbStorage.ref(storagePath);
+      return storageRef.put(blob).then(() => storageRef.getDownloadURL()).then(url => {
+        const newPhoto = { url, ts, by, uploadedByUid: currentUser ? currentUser.uid : null, storagePath };
+        fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
+          const raw = snap.val();
+          const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
+          photos.push(newPhoto);
+          const updates = {};
+          updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
+          updates['lastModified'] = Date.now();
+          return fbRef.update(updates).then(() => {
+            const currentJob = getDayData(dayKey).jobs[jobIdx];
+            if (currentJob) {
+              currentJob.photos = photos;
+              renderDay();
+              sendJobEventNotification(currentJob, dayKey, jobIdx,
+                currentUser ? currentUser.uid : null, by || 'Someone', 'photo');
+            }
+            msg.style.color = '#4caf50';
+            msg.textContent = '✓ Saved to Photos.';
+            setTimeout(() => { msg.textContent = ''; }, 3000);
+          });
+        }).catch(() => { msg.style.color = '#e94560'; msg.textContent = 'Failed to save photo.'; });
+      });
+    }).catch(err => { console.error('Photo upload failed', err); msg.style.color = '#e94560'; msg.textContent = 'Upload failed.'; });
     return;
   }
   const msg = document.getElementById('fileUploadMsg');
-  if (file.size > 5 * 1024 * 1024) {
+  if (file.size > 10 * 1024 * 1024) {
     msg.style.color = '#e94560';
-    msg.textContent = 'File too large — max 5 MB.';
+    msg.textContent = 'File too large — max 10 MB.';
     return;
   }
   msg.style.color = '#aaa';
-  msg.textContent = 'Reading file…';
-  const reader = new FileReader();
-  reader.onload = e => {
-    const newFile = {
-      name: file.name,
-      type: file.type,
-      data: e.target.result,
-      ts: Date.now(),
-      by: document.getElementById('userName').textContent || '',
-      uploadedByUid: currentUser ? currentUser.uid : null
-    };
-    if (fileContext.mode === 'request') {
+  msg.textContent = 'Uploading file…';
+  const by = document.getElementById('userName').textContent || '';
+  const ts = Date.now();
+  if (fileContext.mode === 'request') {
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `request-files/${fileContext.reqKey}/${ts}_${safeName}`;
+    const storageRef = fbStorage.ref(storagePath);
+    storageRef.put(file).then(() => storageRef.getDownloadURL()).then(url => {
+      const newFile = { name: file.name, type: file.type, ts, by, uploadedByUid: currentUser ? currentUser.uid : null, storagePath, url };
       firebase.database().ref('requests/' + fileContext.reqKey + '/files').once('value').then(snap => {
         const files = snap.val() || [];
         files.push(newFile);
@@ -3598,11 +3610,16 @@ function handleFileUpload(event) {
       }).then(() => {
         openFilesForRequest(fileContext.reqKey);
       }).catch(() => { msg.style.color = '#e94560'; msg.textContent = 'Upload failed.'; });
-      return;
-    }
-    const dayKey = fileContext.dayKey;
-    const jobIdx = fileContext.jobIdx;
-    msg.textContent = 'Saving…';
+    }).catch(err => { console.error('File upload failed', err); msg.style.color = '#e94560'; msg.textContent = 'Upload failed.'; });
+    return;
+  }
+  const dayKey = fileContext.dayKey;
+  const jobIdx = fileContext.jobIdx;
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const storagePath = `job-files/${dayKey}_${jobIdx}/${ts}_${safeName}`;
+  const storageRef = fbStorage.ref(storagePath);
+  storageRef.put(file).then(() => storageRef.getDownloadURL()).then(url => {
+    const newFile = { name: file.name, type: file.type, ts, by, uploadedByUid: currentUser ? currentUser.uid : null, storagePath, url };
     fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/files').once('value').then(snap => {
       const raw = snap.val();
       const files = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
@@ -3617,7 +3634,7 @@ function handleFileUpload(event) {
           renderFileList(files);
           renderDay();
           sendJobEventNotification(currentJob, dayKey, jobIdx,
-            currentUser ? currentUser.uid : null, newFile.by || 'Someone', 'file');
+            currentUser ? currentUser.uid : null, by || 'Someone', 'file');
         }
         msg.style.color = '#4caf50';
         msg.textContent = '✓ File added.';
@@ -3627,37 +3644,48 @@ function handleFileUpload(event) {
       msg.style.color = '#e94560';
       msg.textContent = 'Upload failed.';
     });
-  };
-  reader.onerror = () => { msg.style.color = '#e94560'; msg.textContent = 'Failed to read file.'; };
-  reader.readAsDataURL(file);
+  }).catch(err => {
+    console.error('File upload failed', err);
+    msg.style.color = '#e94560';
+    msg.textContent = 'Upload failed.';
+  });
 }
 
 function downloadFile(idx) {
   const f = renderedFiles[idx];
   if (!f) return;
-  const a = document.createElement('a');
-  a.href = f.data;
-  a.download = f.name;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  if (f.url && !f.url.startsWith('data:')) {
+    const a = document.createElement('a');
+    a.href = f.url; a.download = f.name || 'file'; a.target = '_blank';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    return;
+  }
+  if (f.data) {
+    const a = document.createElement('a');
+    a.href = f.data; a.download = f.name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
 }
 
 function viewFile(idx) {
   const f = renderedFiles[idx];
-  if (!f || !f.data) return;
-  try {
-    const parts = f.data.split(',');
-    const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'application/octet-stream';
-    const bytes = atob(parts[1]);
-    const arr = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-    const blob = new Blob([arr], { type: mime });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch(e) {
-    alert('Cannot preview this file.');
+  if (!f) return;
+  if (f.url && !f.url.startsWith('data:')) {
+    window.open(f.url, '_blank');
+    return;
+  }
+  if (f.data) {
+    try {
+      const parts = f.data.split(',');
+      const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'application/octet-stream';
+      const bytes = atob(parts[1]);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      const blob = new Blob([arr], { type: mime });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch(e) { alert('Cannot preview this file.'); }
   }
 }
 
@@ -3678,11 +3706,14 @@ function deleteFile(idx) {
   fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/files').once('value').then(snap => {
     const raw = snap.val();
     const files = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
-    files.splice(idx, 1);
+    const removed = files.splice(idx, 1)[0];
     const updates = {};
     updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/files'] = files;
     updates['lastModified'] = Date.now();
     return fbRef.update(updates).then(() => {
+      if (removed && removed.storagePath && fbStorage) {
+        fbStorage.ref(removed.storagePath).delete().catch(e => console.warn('Storage delete failed', e));
+      }
       const currentJob = getDayData(dayKey).jobs[jobIdx];
       if (currentJob) {
         currentJob.files = files;
@@ -3868,11 +3899,13 @@ const FB_CONFIG = {
 };
 let fbReady = false;
 let fbRef = null;
+let fbStorage = null;
 
 function initFirebase() {
   try {
     firebase.initializeApp(FB_CONFIG);
     fbRef = firebase.database().ref('schedule');
+    fbStorage = firebase.storage();
     fbReady = true;
   } catch(e) { console.warn('Firebase init failed', e); }
 }
