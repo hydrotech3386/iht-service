@@ -1396,6 +1396,9 @@ function setupFirebaseListener() {
                   const _f = _fbJob.files  ? (Array.isArray(_fbJob.files)  ? _fbJob.files  : Object.values(_fbJob.files))  : [];
                   if ((_localJobs[_idx].photos || []).length !== _p.length) { _localJobs[_idx].photos = _p; photosChanged = true; }
                   if ((_localJobs[_idx].files  || []).length !== _f.length) { _localJobs[_idx].files  = _f; photosChanged = true; }
+                  const _fbLoc = _fbJob.location || null;
+                  const _localLoc = _localJobs[_idx].location || null;
+                  if (JSON.stringify(_fbLoc) !== JSON.stringify(_localLoc)) { _localJobs[_idx].location = _fbLoc; photosChanged = true; }
                 });
               }
               if (photosChanged) try { renderDay(); } catch(e) {}
@@ -2266,7 +2269,7 @@ function renderDay() {
         <button class="btn-comment" onclick="openComments('${currentDay}',${idx})" title="Comments">💬${cmtCount ? `<span class="comment-badge">${cmtCount}</span>` : ''}</button>
         <button class="btn-photo" onclick="openPhotos('${currentDay}',${idx})" title="Photos" style="position:relative">📷${(job.photos||[]).length ? `<span class="photo-badge">${(job.photos||[]).length}</span>` : ''}</button>
         <button class="btn-photo" onclick="openFiles('${currentDay}',${idx})" title="Files" style="position:relative">📎${(job.files||[]).length ? `<span class="photo-badge">${(job.files||[]).length}</span>` : ''}</button>
-        <button class="btn-location" onclick="shareJobLocation('${currentDay}',${idx})" title="Share my location">📍</button>
+        <button class="btn-location" onclick="shareJobLocation('${currentDay}',${idx})" title="${job.location ? 'Update location' : 'Share my location'}" style="position:relative">📍${job.location ? '<span class="photo-badge" style="background:#6c5ce7">1</span>' : ''}</button>
         <button class="btn-edit-job" onclick="editJob(${idx})" title="Edit">✏</button>
         <button class="btn-edit-job" onclick="openReschedule(${idx})" title="Reschedule">📅</button>
         <button class="btn-edit-job" onclick="moveJob(${idx},-1)" title="Move Up">▲</button>
@@ -2838,9 +2841,11 @@ function saveCommentToFirebase(dayKey, jobs) {
 
 function saveJobField(dayKey, jobIdx, field, value) {
   if (!fbReady) return;
+  const ts = Date.now();
+  state.lastModified = ts;
   const updates = {};
   updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/' + field] = value;
-  updates['lastModified'] = Date.now();
+  updates['lastModified'] = ts;
   fbRef.update(updates).catch(e => console.error('Field save failed', e));
 }
 
