@@ -3263,7 +3263,7 @@ function openPhotos(dayKey, jobIdx) {
   const d = getDayData(dayKey);
   const job = d.jobs[jobIdx];
   if (!job) return;
-  photoContext = { dayKey, jobIdx };
+  photoContext = { dayKey, jobIdx, jobId: job.jobId || null };
   document.getElementById('photoTitle').textContent = `📷 ${job.customer || 'Job ' + (jobIdx + 1)}`;
   const canUpload = currentRole === 'admin' || currentRole === 'technician' || currentRole === 'salesman';
   document.getElementById('photoUploadBtn').style.display = canUpload ? 'block' : 'none';
@@ -3385,26 +3385,40 @@ function handlePhotoFile(event) {
       });
     }
     const dayKey = photoContext.dayKey;
+    const jobId = photoContext.jobId;
     const jobIdx = photoContext.jobIdx;
     msg.textContent = 'Uploading…';
     const storagePath = `job-photos/${dayKey}_${jobIdx}/${ts}.jpg`;
     const storageRef = fbStorage.ref(storagePath);
     return storageRef.put(blob).then(() => storageRef.getDownloadURL()).then(url => {
       const newPhoto = { url, ts, by, uploadedByUid: currentUser ? currentUser.uid : null, storagePath };
-      fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
-        const raw = snap.val();
-        const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
-        photos.push(newPhoto);
+      // Re-read the current job index from Firebase to handle concurrent job additions/deletions
+      fbRef.child('schedule/' + dayKey + '/jobs').once('value').then(snap => {
+        const rawJobs = snap.val();
+        const fbJobs = rawJobs ? (Array.isArray(rawJobs) ? rawJobs : Object.values(rawJobs)) : [];
+        // Find job by jobId if available, else fall back to index
+        let targetIdx = jobIdx;
+        if (jobId) {
+          const found = fbJobs.findIndex(j => j && j.jobId === jobId);
+          if (found !== -1) targetIdx = found;
+        }
+        const existing = fbJobs[targetIdx];
+        const existingPhotos = existing && existing.photos
+          ? (Array.isArray(existing.photos) ? [...existing.photos] : Object.values(existing.photos))
+          : [];
+        existingPhotos.push(newPhoto);
+        const writeTs = Date.now();
         const updates = {};
-        updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
-        updates['lastModified'] = Date.now();
+        updates['schedule/' + dayKey + '/jobs/' + targetIdx + '/photos'] = existingPhotos;
+        updates['lastModified'] = writeTs;
         return fbRef.update(updates).then(() => {
-          const currentJob = getDayData(dayKey).jobs[jobIdx];
+          state.lastModified = writeTs;
+          const currentJob = getDayData(dayKey).jobs[targetIdx];
           if (currentJob) {
-            currentJob.photos = photos;
-            renderPhotoGrid(photos);
+            currentJob.photos = existingPhotos;
+            renderPhotoGrid(existingPhotos);
             renderDay();
-            sendJobEventNotification(currentJob, dayKey, jobIdx,
+            sendJobEventNotification(currentJob, dayKey, targetIdx,
               currentUser ? currentUser.uid : null, by || 'Someone', 'photo');
           }
           msg.style.color = '#4caf50';
@@ -3466,7 +3480,7 @@ function openFiles(dayKey, jobIdx) {
   const d = getDayData(dayKey);
   const job = d.jobs[jobIdx];
   if (!job) return;
-  fileContext = { dayKey, jobIdx };
+  fileContext = { dayKey, jobIdx, jobId: job.jobId || null };
   document.getElementById('filesTitle').textContent = `📎 ${job.customer || 'Job ' + (jobIdx + 1)}`;
   const canUpload = currentRole === 'admin' || currentRole === 'salesman' || currentRole === 'technician';
   document.getElementById('fileUploadBtn').style.display = canUpload ? 'block' : 'none';
@@ -3561,6 +3575,7 @@ function handleFileUpload(event) {
     msg.textContent = 'Saving as photo…';
     const dayKey = fileContext.dayKey;
     const jobIdx = fileContext.jobIdx;
+    const jobId = fileContext.jobId || null;
     const by = document.getElementById('userName').textContent || '';
     compressImage(file, 1200, 0.75).then(blob => {
       const ts = Date.now();
@@ -3568,19 +3583,25 @@ function handleFileUpload(event) {
       const storageRef = fbStorage.ref(storagePath);
       return storageRef.put(blob).then(() => storageRef.getDownloadURL()).then(url => {
         const newPhoto = { url, ts, by, uploadedByUid: currentUser ? currentUser.uid : null, storagePath };
-        fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/photos').once('value').then(snap => {
-          const raw = snap.val();
-          const photos = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
+        fbRef.child('schedule/' + dayKey + '/jobs').once('value').then(snap => {
+          const rawJobs = snap.val();
+          const fbJobs = rawJobs ? (Array.isArray(rawJobs) ? rawJobs : Object.values(rawJobs)) : [];
+          let targetIdx = jobIdx;
+          if (jobId) { const found = fbJobs.findIndex(j => j && j.jobId === jobId); if (found !== -1) targetIdx = found; }
+          const existing = fbJobs[targetIdx];
+          const photos = existing && existing.photos ? (Array.isArray(existing.photos) ? [...existing.photos] : Object.values(existing.photos)) : [];
           photos.push(newPhoto);
+          const writeTs = Date.now();
           const updates = {};
-          updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/photos'] = photos;
-          updates['lastModified'] = Date.now();
+          updates['schedule/' + dayKey + '/jobs/' + targetIdx + '/photos'] = photos;
+          updates['lastModified'] = writeTs;
           return fbRef.update(updates).then(() => {
-            const currentJob = getDayData(dayKey).jobs[jobIdx];
+            state.lastModified = writeTs;
+            const currentJob = getDayData(dayKey).jobs[targetIdx];
             if (currentJob) {
               currentJob.photos = photos;
               renderDay();
-              sendJobEventNotification(currentJob, dayKey, jobIdx,
+              sendJobEventNotification(currentJob, dayKey, targetIdx,
                 currentUser ? currentUser.uid : null, by || 'Someone', 'photo');
             }
             msg.style.color = '#4caf50';
@@ -3620,25 +3641,32 @@ function handleFileUpload(event) {
   }
   const dayKey = fileContext.dayKey;
   const jobIdx = fileContext.jobIdx;
+  const jobId = fileContext.jobId || null;
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const storagePath = `job-files/${dayKey}_${jobIdx}/${ts}_${safeName}`;
   const storageRef = fbStorage.ref(storagePath);
   storageRef.put(file).then(() => storageRef.getDownloadURL()).then(url => {
     const newFile = { name: file.name, type: file.type, ts, by, uploadedByUid: currentUser ? currentUser.uid : null, storagePath, url };
-    fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx + '/files').once('value').then(snap => {
-      const raw = snap.val();
-      const files = raw ? (Array.isArray(raw) ? [...raw] : Object.values(raw)) : [];
+    fbRef.child('schedule/' + dayKey + '/jobs').once('value').then(snap => {
+      const rawJobs = snap.val();
+      const fbJobs = rawJobs ? (Array.isArray(rawJobs) ? rawJobs : Object.values(rawJobs)) : [];
+      let targetIdx = jobIdx;
+      if (jobId) { const found = fbJobs.findIndex(j => j && j.jobId === jobId); if (found !== -1) targetIdx = found; }
+      const existing = fbJobs[targetIdx];
+      const files = existing && existing.files ? (Array.isArray(existing.files) ? [...existing.files] : Object.values(existing.files)) : [];
       files.push(newFile);
+      const writeTs = Date.now();
       const updates = {};
-      updates['schedule/' + dayKey + '/jobs/' + jobIdx + '/files'] = files;
-      updates['lastModified'] = Date.now();
+      updates['schedule/' + dayKey + '/jobs/' + targetIdx + '/files'] = files;
+      updates['lastModified'] = writeTs;
       return fbRef.update(updates).then(() => {
-        const currentJob = getDayData(dayKey).jobs[jobIdx];
+        state.lastModified = writeTs;
+        const currentJob = getDayData(dayKey).jobs[targetIdx];
         if (currentJob) {
           currentJob.files = files;
           renderFileList(files);
           renderDay();
-          sendJobEventNotification(currentJob, dayKey, jobIdx,
+          sendJobEventNotification(currentJob, dayKey, targetIdx,
             currentUser ? currentUser.uid : null, by || 'Someone', 'file');
         }
         msg.style.color = '#4caf50';
