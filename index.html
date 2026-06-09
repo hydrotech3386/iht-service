@@ -150,6 +150,8 @@
   .summary-empty{color:#555;font-size:13px;padding:24px 0;text-align:center}
   .btn-summary{background:#f39c12;color:#000}
   .btn-summary:hover{background:#d68910}
+  .btn-ext-billing{background:#16a085;color:#fff}
+  .btn-ext-billing:hover{background:#1abc9c}
   .btn-backup{background:#8e44ad;color:#fff}
   .btn-backup:hover{filter:brightness(1.15)}
   .btn-pdf{background:#1a6fa8;color:#fff}
@@ -239,6 +241,9 @@
   .role-technician .btn-del-week{display:none}
   .role-technician .btn-copy{display:none}
   .role-technician .btn-summary{display:none}
+  .role-salesman .btn-ext-billing{display:none}
+  .role-technician .btn-ext-billing{display:none}
+  .view-only .btn-ext-billing{display:none}
   .role-technician .btn-load{display:none}
   .role-technician .btn-backup{display:none}
   .role-technician .btn-pdf{display:none}
@@ -541,6 +546,7 @@
   <button class="btn-requests" id="btnRequests" onclick="openRequestsPanel()">📬 Requests<span class="req-count" id="reqCount" style="display:none">0</span></button>
   <button class="btn-copy" onclick="showWAPreview()">📋 Copy for WhatsApp</button>
   <button class="btn-summary" id="btnSummary" onclick="openSummary()" style="position:relative">📊 Internal Billing<span class="req-count" id="ibPendingCount" style="display:none">0</span></button>
+  <button class="btn-ext-billing" onclick="openExtBilling()">📋 Ext. Billing</button>
   <button class="btn-load" onclick="toggleHistory()">📁 History</button>
   <button class="btn-del-week" onclick="deleteWeek()">🗑 Delete Week</button>
   <button class="btn-backup" onclick="exportBackup()">⬇ Backup</button>
@@ -752,6 +758,22 @@
     <div id="summaryContent"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="document.getElementById('summaryBg').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- External Billing Report Modal -->
+<div class="modal-bg" id="extBillingBg">
+  <div class="modal" style="max-width:720px">
+    <h2>📋 External Billing Report</h2>
+    <div class="month-selector">
+      <select id="extBillingMonth" onchange="renderExtBilling()"></select>
+    </div>
+    <div id="extBillingContent" style="max-height:50vh;overflow-y:auto;margin:8px 0"></div>
+    <div class="modal-actions">
+      <button class="btn-confirm" onclick="exportExtBillingPDF()" style="background:#2980b9">📄 PDF</button>
+      <button class="btn-confirm" onclick="exportExtBillingCSV()" style="background:#27ae60">⬇ CSV / Excel</button>
+      <button class="btn-cancel" onclick="document.getElementById('extBillingBg').classList.remove('open')">Close</button>
     </div>
   </div>
 </div>
@@ -3993,6 +4015,126 @@ function persistState() {
 }
 
 // ---- PDF Export ----
+// ---- External Billing Export ----
+function openExtBilling() {
+  const sel = document.getElementById('extBillingMonth');
+  sel.innerHTML = '';
+  const months = new Set();
+  Object.keys(state.schedule).forEach(dateKey => {
+    const day = getDayData(dateKey);
+    if ((day.jobs || []).some(j => !j.internalBilling && j.customer)) months.add(dateKey.slice(0, 7));
+  });
+  if (months.size === 0) {
+    sel.innerHTML = '<option value="">No external jobs found</option>';
+  } else {
+    [...months].sort().reverse().forEach(m => {
+      const [y, mo] = m.split('-');
+      const label = new Date(y, mo-1, 1).toLocaleString('en-GB', {month:'long', year:'numeric'});
+      sel.innerHTML += `<option value="${m}">${label}</option>`;
+    });
+  }
+  document.getElementById('extBillingBg').classList.add('open');
+  renderExtBilling();
+}
+
+function getExtBillingJobs(month) {
+  const jobs = [];
+  Object.keys(state.schedule).sort().forEach(dateKey => {
+    if (!dateKey.startsWith(month)) return;
+    getDayData(dateKey).jobs.forEach(job => {
+      if (job.internalBilling || !job.customer) return;
+      jobs.push({ date: dateKey, customer: job.customer || '', contact: job.contact || '', address: job.address || '', desc: job.desc || '', team: Array.isArray(job.team) ? job.team.join(', ') : (job.team || ''), salesman: job.salesman || '', status: job.status || 'pending' });
+    });
+  });
+  return jobs;
+}
+
+function renderExtBilling() {
+  const month = document.getElementById('extBillingMonth').value;
+  const content = document.getElementById('extBillingContent');
+  if (!month) { content.innerHTML = '<div class="summary-empty">No data.</div>'; return; }
+  const jobs = getExtBillingJobs(month);
+  if (!jobs.length) { content.innerHTML = '<div class="summary-empty">No external billing jobs for this month.</div>'; return; }
+  const statusColors = { pending:'#666', 'in-progress':'#f39c12', completed:'#27ae60', cancelled:'#e94560' };
+  const table = document.createElement('table');
+  table.className = 'summary-table';
+  table.innerHTML = '<thead><tr><th>Date</th><th>Customer</th><th>Contact</th><th>Team</th><th>Salesman</th><th>Status</th></tr></thead>';
+  const tbody = document.createElement('tbody');
+  jobs.forEach(j => {
+    const d = new Date(j.date);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="white-space:nowrap;color:#aaa;font-size:12px">${d.getDate()}/${d.getMonth()+1}</td>
+      <td><div style="font-weight:600">${j.customer}</div>${j.address?'<div style="font-size:11px;color:#888">'+j.address+'</div>':''}${j.desc?'<div style="font-size:11px;color:#888">'+j.desc+'</div>':''}</td>
+      <td style="color:#4fc3f7;font-size:12px">${j.contact}</td>
+      <td style="color:#5dfc8d;font-size:12px">${j.team}</td>
+      <td style="color:#aaa;font-size:12px">${j.salesman}</td>
+      <td style="color:${statusColors[j.status]||'#666'};font-size:11px;font-weight:600;text-transform:uppercase">${j.status}</td>`;
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  const totalDiv = document.createElement('div');
+  totalDiv.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:10px 14px;background:#0f3460;border-radius:8px';
+  totalDiv.innerHTML = `<span style="font-weight:700;color:#ccc;font-size:13px">Total: ${jobs.length} job${jobs.length!==1?'s':''}</span>`;
+  content.innerHTML = '';
+  content.appendChild(table);
+  content.appendChild(totalDiv);
+}
+
+function exportExtBillingPDF() {
+  const month = document.getElementById('extBillingMonth').value;
+  if (!month) return;
+  if (!window.jspdf) { alert('PDF library not loaded. Check internet connection.'); return; }
+  const jobs = getExtBillingJobs(month);
+  if (!jobs.length) { alert('No jobs to export.'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const [y, mo] = month.split('-');
+  const monthLabel = new Date(y, mo-1, 1).toLocaleString('en-GB', {month:'long', year:'numeric'});
+  const pageW = 297; const margin = 12;
+  doc.setFillColor(22, 33, 62); doc.rect(0, 0, pageW, 26, 'F');
+  doc.setTextColor(233, 69, 96); doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+  doc.text('Ipoh Hydrotech Engineering Sdn Bhd', margin, 10);
+  doc.setTextColor(200, 200, 200); doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+  doc.text('External Billing Report  |  ' + monthLabel, margin, 17);
+  doc.setFontSize(7.5); doc.setTextColor(130, 130, 130);
+  doc.text('Generated: ' + new Date().toLocaleString('en-GB'), pageW - margin, 17, { align: 'right' });
+  const body = jobs.map((j, i) => {
+    const d = new Date(j.date);
+    return [i+1, `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`, [j.customer, j.address].filter(Boolean).join('\n'), j.contact, j.desc, j.team, j.salesman, j.status.toUpperCase()];
+  });
+  doc.autoTable({
+    startY: 30,
+    head: [['#','Date','Customer / Address','Contact','Description','Team','Salesman','Status']],
+    body,
+    margin: { left: margin, right: margin },
+    styles: { fontSize: 8, cellPadding: {top:2,right:2,bottom:2,left:2}, valign: 'top', overflow: 'linebreak' },
+    headStyles: { fillColor: [26,26,46], textColor: [180,180,180], fontStyle: 'bold', fontSize: 7.5 },
+    alternateRowStyles: { fillColor: [240,242,248] },
+    columnStyles: { 0:{cellWidth:8,halign:'center'}, 1:{cellWidth:22}, 2:{cellWidth:55}, 3:{cellWidth:28}, 4:{cellWidth:50}, 5:{cellWidth:35}, 6:{cellWidth:25}, 7:{cellWidth:22} }
+  });
+  const total = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= total; p++) { doc.setPage(p); doc.setFontSize(7.5); doc.setTextColor(160,160,160); doc.text('Page '+p+' of '+total, pageW/2, 206, {align:'center'}); }
+  doc.save('External-Billing-' + month + '.pdf');
+}
+
+function exportExtBillingCSV() {
+  const month = document.getElementById('extBillingMonth').value;
+  if (!month) return;
+  const jobs = getExtBillingJobs(month);
+  if (!jobs.length) { alert('No jobs to export.'); return; }
+  const esc = v => '"' + String(v||'').replace(/"/g,'""') + '"';
+  const rows = [['No.','Date','Customer','Address','Contact','Description','Team','Salesman','Status'].map(esc).join(',')];
+  jobs.forEach((j, i) => {
+    const d = new Date(j.date);
+    rows.push([i+1, `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`, j.customer, j.address, j.contact, j.desc, j.team, j.salesman, j.status].map(esc).join(','));
+  });
+  const csv = '﻿' + rows.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `External-Billing-${month}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
 function exportWeekPDF() {
   if (!window.jspdf) { alert('PDF library not loaded. Check your internet connection.'); return; }
   const { jsPDF } = window.jspdf;
