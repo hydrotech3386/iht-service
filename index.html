@@ -311,6 +311,19 @@
   .btn-photo{background:#1a4a3a!important;border:1px solid #27ae60!important;color:#5dfc8d!important;position:relative}
   .btn-job-change{background:#4a3000!important;border:1px solid #f39c12!important;color:#f39c12!important}
   .btn-photo:hover{background:#27ae60!important;color:#fff!important}
+  .btn-video{background:#2a1a4a!important;border:1px solid #8e44ad!important;color:#bf7fff!important;position:relative}
+  .btn-video:hover{background:#8e44ad!important;color:#fff!important}
+  .video-badge{position:absolute;top:-5px;right:-5px;background:#8e44ad;color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  .video-list{display:flex;flex-direction:column;gap:12px;max-height:420px;overflow-y:auto;margin:8px 0}
+  .video-item{background:#0f3460;border-radius:8px;overflow:hidden}
+  .video-item video{width:100%;max-height:260px;display:block;background:#000}
+  .video-item-meta{padding:6px 10px;display:flex;align-items:center;gap:8px}
+  .video-item-name{font-size:12px;color:#ccc;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .video-item-del{background:none;border:none;color:#e94560;cursor:pointer;font-size:14px;padding:2px 6px;flex-shrink:0}
+  .video-empty{color:#555;font-size:13px;text-align:center;padding:24px}
+  .upload-progress{margin:6px 0 4px}
+  .progress-bar{background:#1a1a2e;border-radius:4px;height:6px;overflow:hidden;margin-bottom:4px}
+  .progress-fill{background:#8e44ad;height:100%;width:0%;transition:width .15s;border-radius:4px}
   /* Lightbox */
   .lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;flex-direction:column}
   .lightbox.open{display:flex}
@@ -429,6 +442,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
@@ -673,6 +687,25 @@
     <div style="font-size:11px;color:#555;text-align:center">Max 5 MB per file</div>
     <div class="modal-actions" style="margin-top:10px">
       <button class="btn-cancel" onclick="closeFilesBg()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Video Modal -->
+<div class="modal-bg" id="videoBg">
+  <div class="modal" style="max-width:540px">
+    <h2 id="videoTitle">📹 Videos</h2>
+    <div class="video-list" id="videoList"></div>
+    <button class="photo-upload-btn" id="videoUploadBtn" onclick="triggerVideoUpload()" style="margin-top:8px">📹 Upload Video</button>
+    <input type="file" id="videoFileInput" accept="video/*" style="display:none" onchange="handleVideoUpload(event)">
+    <div class="upload-progress" id="videoUploadProgress" style="display:none">
+      <div class="progress-bar"><div class="progress-fill" id="videoProgressFill"></div></div>
+      <div style="font-size:11px;color:#aaa;text-align:center" id="videoProgressText">0%</div>
+    </div>
+    <div id="videoUploadMsg" style="font-size:12px;color:#aaa;min-height:16px;text-align:center;margin-top:4px"></div>
+    <div style="font-size:11px;color:#555;text-align:center">Max 200 MB per video</div>
+    <div class="modal-actions" style="margin-top:10px">
+      <button class="btn-cancel" onclick="document.getElementById('videoBg').classList.remove('open')">Close</button>
     </div>
   </div>
 </div>
@@ -1860,6 +1893,9 @@ function getDayData(dayKey) {
     if (!Array.isArray(job.comments)) {
       job.comments = (job.comments && typeof job.comments === 'object') ? Object.values(job.comments) : [];
     }
+    if (!Array.isArray(job.videos)) {
+      job.videos = (job.videos && typeof job.videos === 'object') ? Object.values(job.videos) : [];
+    }
   });
   if (typeof entry.holiday !== 'boolean') entry.holiday = false;
   if (typeof entry.holidayLabel !== 'string') entry.holidayLabel = '';
@@ -2007,6 +2043,7 @@ function renderDay() {
         <button class="btn-comment" onclick="openComments('${currentDay}',${idx})" title="Comments">💬${cmtCount ? `<span class="comment-badge">${cmtCount}</span>` : ''}</button>
         <button class="btn-photo" onclick="openPhotos('${currentDay}',${idx})" title="Photos" style="position:relative">📷${(job.photos||[]).length ? `<span class="photo-badge">${(job.photos||[]).length}</span>` : ''}</button>
         <button class="btn-photo" onclick="openFiles('${currentDay}',${idx})" title="Files" style="position:relative">📎${(job.files||[]).length ? `<span class="photo-badge">${(job.files||[]).length}</span>` : ''}</button>
+        <button class="btn-video" onclick="openVideos('${currentDay}',${idx})" title="Videos" style="position:relative">📹${(job.videos||[]).length ? `<span class="video-badge">${(job.videos||[]).length}</span>` : ''}</button>
         <button class="btn-edit-job" onclick="shareJobLocation('${currentDay}',${idx})" title="Share my location">📍</button>
         <button class="btn-edit-job" onclick="editJob(${idx})" title="Edit">✏</button>
         <button class="btn-edit-job" onclick="openReschedule(${idx})" title="Reschedule">📅</button>
@@ -2294,7 +2331,8 @@ function saveJob() {
     ibAmount: document.getElementById('fInternalBilling').checked ? (parseFloat(document.getElementById('fIBAmount').value) || 0) : 0,
     desc: document.getElementById('fDesc').value.trim(),
     status: existing ? (existing.status || 'pending') : 'pending',
-    comments: existing ? (existing.comments || []) : []
+    comments: existing ? (existing.comments || []) : [],
+    videos: existing ? (existing.videos || []) : []
   };
   if (!isNew) {
     data.jobs[editingJob.jobIdx] = job;
@@ -3155,6 +3193,131 @@ function deleteFile(idx) {
   renderDay();
 }
 
+// ---- Videos ----
+let videoContext = null;
+
+function openVideos(dayKey, jobIdx) {
+  const d = getDayData(dayKey);
+  const job = d.jobs[jobIdx];
+  if (!job) return;
+  videoContext = { dayKey, jobIdx };
+  document.getElementById('videoTitle').textContent = `📹 ${job.customer || 'Job ' + (jobIdx + 1)}`;
+  const canUpload = currentRole === 'admin' || currentRole === 'technician' || currentRole === 'salesman';
+  document.getElementById('videoUploadBtn').style.display = canUpload ? 'block' : 'none';
+  document.getElementById('videoUploadMsg').textContent = '';
+  document.getElementById('videoUploadProgress').style.display = 'none';
+  renderVideoList(job.videos || []);
+  document.getElementById('videoBg').classList.add('open');
+}
+
+function canDeleteVideo(v) {
+  if (currentRole === 'admin') return true;
+  if (!currentUser) return false;
+  return v.uploadedByUid && v.uploadedByUid === currentUser.uid;
+}
+
+function renderVideoList(videos) {
+  const list = document.getElementById('videoList');
+  if (!videos.length) {
+    list.innerHTML = '<div class="video-empty">No videos yet.</div>';
+    return;
+  }
+  list.innerHTML = videos.map((v, i) => `
+    <div class="video-item">
+      <video src="${v.url}" controls preload="metadata"></video>
+      <div class="video-item-meta">
+        <div style="flex:1;min-width:0">
+          <div class="video-item-name" title="${v.name}">${v.name}</div>
+          <div style="font-size:11px;color:#666">${v.by || ''}${v.by && v.ts ? ' · ' : ''}${v.ts ? new Date(v.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : ''}</div>
+        </div>
+        ${canDeleteVideo(v) ? `<button class="video-item-del" onclick="deleteVideo(${i})" title="Delete">✕</button>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function triggerVideoUpload() {
+  document.getElementById('videoFileInput').value = '';
+  document.getElementById('videoFileInput').click();
+}
+
+function handleVideoUpload(event) {
+  const file = event.target.files[0];
+  if (!file || !videoContext) return;
+  const msg = document.getElementById('videoUploadMsg');
+  const progress = document.getElementById('videoUploadProgress');
+  const fill = document.getElementById('videoProgressFill');
+  const pText = document.getElementById('videoProgressText');
+  if (file.size > 200 * 1024 * 1024) {
+    msg.style.color = '#e94560';
+    msg.textContent = 'File too large — max 200 MB.';
+    return;
+  }
+  if (!fbStorage) {
+    msg.style.color = '#e94560';
+    msg.textContent = 'Storage not available. Check connection.';
+    return;
+  }
+  msg.textContent = '';
+  progress.style.display = 'block';
+  fill.style.width = '0%';
+  pText.textContent = '0%';
+  const { dayKey, jobIdx } = videoContext;
+  const ext = file.name.split('.').pop();
+  const storePath = `videos/${dayKey}/${jobIdx}/${Date.now()}.${ext}`;
+  const uploadTask = fbStorage.ref(storePath).put(file);
+  uploadTask.on('state_changed',
+    snap => {
+      const pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
+      fill.style.width = pct + '%';
+      pText.textContent = pct + '%';
+    },
+    err => {
+      progress.style.display = 'none';
+      msg.style.color = '#e94560';
+      msg.textContent = 'Upload failed: ' + err.message;
+    },
+    () => {
+      uploadTask.snapshot.ref.getDownloadURL().then(url => {
+        const d = getDayData(dayKey);
+        const job = d.jobs[jobIdx];
+        if (!job) return;
+        if (!Array.isArray(job.videos)) job.videos = [];
+        job.videos.push({
+          url,
+          name: file.name,
+          ts: Date.now(),
+          by: document.getElementById('userName').textContent || '',
+          uploadedByUid: currentUser ? currentUser.uid : null,
+          storePath
+        });
+        persistState();
+        renderVideoList(job.videos);
+        renderDay();
+        progress.style.display = 'none';
+        msg.style.color = '#4caf50';
+        msg.textContent = '✓ Video uploaded.';
+        setTimeout(() => { msg.textContent = ''; }, 2500);
+      });
+    }
+  );
+}
+
+function deleteVideo(idx) {
+  if (!confirm('Remove this video?')) return;
+  const { dayKey, jobIdx } = videoContext;
+  const d = getDayData(dayKey);
+  const job = d.jobs[jobIdx];
+  if (!job || !job.videos) return;
+  const v = job.videos[idx];
+  if (v && v.storePath && fbStorage) {
+    fbStorage.ref(v.storePath).delete().catch(() => {});
+  }
+  job.videos.splice(idx, 1);
+  persistState();
+  renderVideoList(job.videos);
+  renderDay();
+}
+
 // ---- Request form file attachments ----
 function triggerReqFileUpload() {
   document.getElementById('reqFileInput').value = '';
@@ -3334,11 +3497,13 @@ const FB_CONFIG = {
 };
 let fbReady = false;
 let fbRef = null;
+let fbStorage = null;
 
 function initFirebase() {
   try {
     firebase.initializeApp(FB_CONFIG);
     fbRef = firebase.database().ref('schedule');
+    fbStorage = firebase.storage();
     fbReady = true;
   } catch(e) { console.warn('Firebase init failed', e); }
 }
@@ -3603,7 +3768,7 @@ function loadWeek(monKey) {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
-    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg','jobChangeBg','ibCommentBg'].forEach(id => {
+    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg','videoBg','jobChangeBg','ibCommentBg'].forEach(id => {
       document.getElementById(id).classList.remove('open');
     });
   }
