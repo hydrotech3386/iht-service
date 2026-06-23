@@ -560,7 +560,6 @@
   <button class="btn-backup" onclick="importBackup()" style="background:#6c3483">⬆ Restore</button>
   <button class="btn-pdf" onclick="exportWeekPDF()">📄 Export PDF</button>
   <button class="btn-users" onclick="openManageUsers()">👥 Users</button>
-  <button id="btnRecoverPhotos" onclick="recoverPhotosFromStorage()" style="display:none;background:#7d3c98;border:1px solid #a569bd;color:#e8daef;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">🔄 Recover Photos</button>
 </div>
 
 <div class="days-tabs" id="daysTabs"></div>
@@ -1288,8 +1287,6 @@ function applyRole(role) {
   document.body.classList.remove('view-only','role-admin','role-salesman','role-technician');
   if (role === 'admin') {
     document.body.classList.add('role-admin');
-    const rb = document.getElementById('btnRecoverPhotos');
-    if (rb) rb.style.display = 'inline-block';
   } else if (role === 'salesman') document.body.classList.add('role-salesman');
   else if (role === 'technician') document.body.classList.add('role-technician');
   else document.body.classList.add('view-only');
