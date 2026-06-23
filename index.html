@@ -560,6 +560,7 @@
   <button class="btn-backup" onclick="importBackup()" style="background:#6c3483">⬆ Restore</button>
   <button class="btn-pdf" onclick="exportWeekPDF()">📄 Export PDF</button>
   <button class="btn-users" onclick="openManageUsers()">👥 Users</button>
+  <button id="btnRecoverPhotos" onclick="recoverPhotosFromStorage()" style="display:none;background:#7d3c98;border:1px solid #a569bd;color:#e8daef;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">🔄 Recover Photos</button>
 </div>
 
 <div class="days-tabs" id="daysTabs"></div>
@@ -1285,8 +1286,11 @@ function getAuthError(code) {
 function applyRole(role) {
   currentRole = role;
   document.body.classList.remove('view-only','role-admin','role-salesman','role-technician');
-  if (role === 'admin') { document.body.classList.add('role-admin'); }
-  else if (role === 'salesman') document.body.classList.add('role-salesman');
+  if (role === 'admin') {
+    document.body.classList.add('role-admin');
+    const rb = document.getElementById('btnRecoverPhotos');
+    if (rb) rb.style.display = 'inline-block';
+  } else if (role === 'salesman') document.body.classList.add('role-salesman');
   else if (role === 'technician') document.body.classList.add('role-technician');
   else document.body.classList.add('view-only');
 }
@@ -3319,26 +3323,6 @@ function openPhotos(dayKey, jobIdx) {
   renderPhotoGrid(job.photos || []);
   document.getElementById('photoBg').classList.add('open');
   if (fbReady) {
-    // Debug: check both possible Firebase paths
-    fbRef.once('value').then(snap => {
-      const root = snap.val();
-      const keys = root ? Object.keys(root).slice(0,8) : [];
-      console.log('[DEBUG] fbRef root keys:', keys);
-      const hasInnerSchedule = root && root.schedule;
-      console.log('[DEBUG] has inner schedule key:', !!hasInnerSchedule);
-      const directDay = root && root[dayKey];
-      console.log('[DEBUG] direct day (fbRef/'+dayKey+'):', directDay ? 'HAS DATA' : 'undefined');
-      const innerDay = hasInnerSchedule && root.schedule[dayKey];
-      console.log('[DEBUG] inner day (fbRef/schedule/'+dayKey+'):', innerDay ? 'HAS DATA' : 'undefined');
-      if (innerDay && innerDay.jobs) {
-        const j = innerDay.jobs[jobIdx];
-        console.log('[DEBUG] inner job photos:', JSON.stringify(j && j.photos));
-      }
-      if (directDay && directDay.jobs) {
-        const j = directDay.jobs[jobIdx];
-        console.log('[DEBUG] direct job photos:', JSON.stringify(j && j.photos));
-      }
-    });
     fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx).once('value').then(snap => {
       const fresh = snap.val();
       if (fresh && fresh.photos) {
@@ -3350,7 +3334,7 @@ function openPhotos(dayKey, jobIdx) {
           renderDay();
         }
       }
-    }).catch((e) => { console.log('[DEBUG openPhotos] error:', e); });
+    }).catch(() => {});
   }
 }
 
@@ -4762,6 +4746,57 @@ function markAllNotifRead() {
   notifList.forEach(n => { if (!n.read) updates[n.key + '/read'] = true; });
   if (Object.keys(updates).length) {
     firebase.database().ref('notifications/' + currentUser.uid).update(updates).catch(() => {});
+  }
+}
+
+// ---- Photo recovery from Firebase Storage ----
+async function recoverPhotosFromStorage() {
+  if (!fbStorage || currentRole !== 'admin') return;
+  const btn = document.getElementById('btnRecoverPhotos');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning...'; }
+  const dbUpdates = {};
+  let count = 0;
+  const errors = [];
+  async function scanFolder(ref) {
+    let result;
+    try { result = await ref.listAll(); } catch(e) { errors.push(e.message); return; }
+    for (const item of result.items) {
+      try {
+        // Path: job-photos/{dayKey}_{jobIdx}/{filename}
+        const parts = item.fullPath.split('/');
+        if (parts.length < 3) continue;
+        const folder = parts[1]; // e.g. "2026-06-22_4"
+        const lastUs = folder.lastIndexOf('_');
+        if (lastUs === -1) continue;
+        const dayKey = folder.substring(0, lastUs);
+        const jobIdx = parseInt(folder.substring(lastUs + 1));
+        if (!dayKey.match(/^\d{4}-\d{2}-\d{2}$/) || isNaN(jobIdx)) continue;
+        const ts = parseInt(parts[2].split('.')[0]) || Date.now();
+        const url = await item.getDownloadURL();
+        const dbPath = 'schedule/' + dayKey + '/jobs/' + jobIdx + '/photos';
+        if (!dbUpdates[dbPath]) dbUpdates[dbPath] = [];
+        dbUpdates[dbPath].push({ url, ts, storagePath: item.fullPath });
+        count++;
+      } catch(e) { errors.push(item.fullPath + ': ' + e.message); }
+    }
+    for (const prefix of result.prefixes) { await scanFolder(prefix); }
+  }
+  try {
+    await scanFolder(fbStorage.ref('job-photos'));
+    if (btn) btn.textContent = '⏳ Found ' + count + ' photos...';
+    if (count === 0) {
+      alert('No photos found in Firebase Storage under job-photos/.\n\nPhotos may have been permanently lost when the app was updated.');
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 Recover Photos'; }
+      return;
+    }
+    const ok = confirm('Found ' + count + ' photos in Firebase Storage.\nRestore references to the database?\n\n(This will re-link the photos to their jobs.)');
+    if (!ok) { if (btn) { btn.disabled = false; btn.textContent = '🔄 Recover Photos'; } return; }
+    await fbRef.update(dbUpdates);
+    alert('✅ Recovered ' + count + ' photos! Please refresh the page.');
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Done'; }
+  } catch(e) {
+    alert('Recovery failed: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Recover Photos'; }
   }
 }
 </script>
