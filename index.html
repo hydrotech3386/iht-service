@@ -3321,6 +3321,7 @@ function openPhotos(dayKey, jobIdx) {
   if (fbReady) {
     fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx).once('value').then(snap => {
       const fresh = snap.val();
+      console.log('[DEBUG openPhotos] path=schedule/schedule/'+dayKey+'/jobs/'+jobIdx, 'fresh=', JSON.stringify(fresh && fresh.photos));
       if (fresh && fresh.photos) {
         const photos = Array.isArray(fresh.photos) ? fresh.photos : Object.values(fresh.photos);
         const currentJob = getDayData(dayKey).jobs[jobIdx];
@@ -3330,7 +3331,7 @@ function openPhotos(dayKey, jobIdx) {
           renderDay();
         }
       }
-    }).catch(() => {});
+    }).catch((e) => { console.log('[DEBUG openPhotos] error:', e); });
   }
 }
 
