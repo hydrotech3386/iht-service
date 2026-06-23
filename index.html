@@ -2120,10 +2120,16 @@ function getDayData(dayKey) {
   if (!Array.isArray(entry.jobs)) {
     entry.jobs = (entry.jobs && typeof entry.jobs === 'object') ? Object.values(entry.jobs) : [];
   }
-  // Ensure each job's comments is an array (Firebase converts arrays to objects)
+  // Ensure each job's arrays are arrays (Firebase converts arrays to objects)
   entry.jobs.forEach(job => {
     if (!Array.isArray(job.comments)) {
       job.comments = (job.comments && typeof job.comments === 'object') ? Object.values(job.comments) : [];
+    }
+    if (!Array.isArray(job.photos)) {
+      job.photos = (job.photos && typeof job.photos === 'object') ? Object.values(job.photos) : [];
+    }
+    if (!Array.isArray(job.files)) {
+      job.files = (job.files && typeof job.files === 'object') ? Object.values(job.files) : [];
     }
   });
   if (typeof entry.holiday !== 'boolean') entry.holiday = false;
@@ -3316,10 +3322,11 @@ function openPhotos(dayKey, jobIdx) {
     fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx).once('value').then(snap => {
       const fresh = snap.val();
       if (fresh && fresh.photos) {
+        const photos = Array.isArray(fresh.photos) ? fresh.photos : Object.values(fresh.photos);
         const currentJob = getDayData(dayKey).jobs[jobIdx];
         if (currentJob) {
-          currentJob.photos = fresh.photos;
-          renderPhotoGrid(fresh.photos);
+          currentJob.photos = photos;
+          renderPhotoGrid(photos);
           renderDay();
         }
       }
@@ -3355,7 +3362,8 @@ function canDeletePhoto(p) {
   return p.uploadedByUid && p.uploadedByUid === currentUser.uid;
 }
 
-function renderPhotoGrid(photos) {
+function renderPhotoGrid(rawPhotos) {
+  const photos = Array.isArray(rawPhotos) ? rawPhotos : (rawPhotos && typeof rawPhotos === 'object' ? Object.values(rawPhotos) : []);
   const grid = document.getElementById('photoGrid');
   if (!photos.length) {
     grid.innerHTML = '<div style="color:#555;font-size:13px;text-align:center;padding:24px;grid-column:1/-1">No photos yet.</div>';
@@ -3582,7 +3590,8 @@ function getFileIcon(type) {
   return '📄';
 }
 
-function renderFileList(files) {
+function renderFileList(rawFiles) {
+  const files = Array.isArray(rawFiles) ? rawFiles : (rawFiles && typeof rawFiles === 'object' ? Object.values(rawFiles) : []);
   renderedFiles = files;
   const div = document.getElementById('filesList');
   if (!files.length) {
