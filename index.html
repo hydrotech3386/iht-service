@@ -3319,9 +3319,28 @@ function openPhotos(dayKey, jobIdx) {
   renderPhotoGrid(job.photos || []);
   document.getElementById('photoBg').classList.add('open');
   if (fbReady) {
+    // Debug: check both possible Firebase paths
+    fbRef.once('value').then(snap => {
+      const root = snap.val();
+      const keys = root ? Object.keys(root).slice(0,8) : [];
+      console.log('[DEBUG] fbRef root keys:', keys);
+      const hasInnerSchedule = root && root.schedule;
+      console.log('[DEBUG] has inner schedule key:', !!hasInnerSchedule);
+      const directDay = root && root[dayKey];
+      console.log('[DEBUG] direct day (fbRef/'+dayKey+'):', directDay ? 'HAS DATA' : 'undefined');
+      const innerDay = hasInnerSchedule && root.schedule[dayKey];
+      console.log('[DEBUG] inner day (fbRef/schedule/'+dayKey+'):', innerDay ? 'HAS DATA' : 'undefined');
+      if (innerDay && innerDay.jobs) {
+        const j = innerDay.jobs[jobIdx];
+        console.log('[DEBUG] inner job photos:', JSON.stringify(j && j.photos));
+      }
+      if (directDay && directDay.jobs) {
+        const j = directDay.jobs[jobIdx];
+        console.log('[DEBUG] direct job photos:', JSON.stringify(j && j.photos));
+      }
+    });
     fbRef.child('schedule/' + dayKey + '/jobs/' + jobIdx).once('value').then(snap => {
       const fresh = snap.val();
-      console.log('[DEBUG openPhotos] path=schedule/schedule/'+dayKey+'/jobs/'+jobIdx, 'fresh=', JSON.stringify(fresh && fresh.photos));
       if (fresh && fresh.photos) {
         const photos = Array.isArray(fresh.photos) ? fresh.photos : Object.values(fresh.photos);
         const currentJob = getDayData(dayKey).jobs[jobIdx];
