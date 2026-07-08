@@ -329,6 +329,26 @@
   .btn-photo{background:#1a4a3a!important;border:1px solid #27ae60!important;color:#5dfc8d!important;position:relative}
   .btn-job-change{background:#4a3000!important;border:1px solid #f39c12!important;color:#f39c12!important}
   .btn-photo:hover{background:#27ae60!important;color:#fff!important}
+  /* Maxus */
+  .btn-maxus{background:#0f3460;border:1px solid #1a6a9a;color:#7dd3fc}
+  .btn-maxus:hover{background:#1a6a9a;color:#fff}
+  .maxus-row{margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .maxus-slot{display:inline-flex;align-items:center;gap:6px;background:#0f2744;border:1px solid #1a6a9a;border-radius:6px;padding:4px 10px;font-size:12px;color:#7dd3fc;cursor:pointer}
+  .maxus-slot:hover{background:#1a3a5c}
+  .maxus-slot.full{border-color:#e94560;color:#f87171;background:#2d1a1a}
+  .maxus-slot.am{border-color:#f59e0b;color:#fcd34d;background:#2d2200}
+  .maxus-slot.pm{border-color:#8b5cf6;color:#c4b5fd;background:#1e1040}
+  .maxus-avail{font-size:11px;color:#555;padding:2px 6px}
+  .maxus-reserve-btn{background:#1a6a9a;border:none;color:#fff;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600}
+  .maxus-reserve-btn:hover{background:#2980b9}
+  .maxus-card{background:#0f2744;border:1px solid #1a4a7a;border-radius:8px;padding:10px 14px;margin-bottom:8px}
+  .maxus-card-slot{font-weight:700;font-size:13px}
+  .maxus-card-slot.FULL{color:#f87171}
+  .maxus-card-slot.AM{color:#fcd34d}
+  .maxus-card-slot.PM{color:#c4b5fd}
+  .maxus-card-meta{font-size:12px;color:#aaa;margin-top:2px}
+  .maxus-card-del{background:none;border:none;color:#e94560;cursor:pointer;font-size:14px;padding:2px 6px;float:right;margin-top:-22px}
+  .maxus-empty{color:#555;text-align:center;padding:24px;font-size:13px}
   .btn-video{background:#2d1a4a!important;border:1px solid #6c5ce7!important;color:#a29bfe!important;position:relative}
   .btn-video:hover{background:#6c5ce7!important;color:#fff!important}
   .video-badge{position:absolute;top:-5px;right:-5px;background:#6c5ce7;color:#fff;border-radius:50%;width:16px;height:16px;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:none}
@@ -548,6 +568,7 @@
   <button class="btn-add" onclick="openModal()">+ Add Job</button>
   <button class="btn-my-jobs" id="btnMyJobs" onclick="toggleMyJobs()">👤 My Jobs</button>
   <button class="btn-search" onclick="openSearch()">🔍 Search</button>
+  <button class="btn-maxus" onclick="openMaxus()">🚙 Maxus</button>
   <button class="btn-notif" id="btnNotif" onclick="openNotifications()" style="display:none">📥 Inbox<span class="req-count" id="notifBadge" style="display:none;background:#e94560;color:#fff;margin-left:4px">0</span></button>
 
   <button class="btn-request" onclick="openServiceRequest()">📋 New Request</button>
@@ -573,6 +594,7 @@
     </div>
   </div>
   <div class="leave-row" id="leaveRow"></div>
+  <div class="maxus-row" id="maxusRow"></div>
   <div class="jobs-list" id="jobsList"></div>
 </div>
 
@@ -914,6 +936,54 @@
     <div id="searchResults"><div class="search-empty">Type to search jobs…</div></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeSearch()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Maxus Modal -->
+<div class="modal-bg" id="maxusBg" onclick="if(event.target===this)document.getElementById('maxusBg').classList.remove('open')">
+  <div class="modal" style="max-width:480px;max-height:85vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-shrink:0">
+      <h2 style="margin:0">🚙 Maxus Reservation</h2>
+      <button class="btn-cancel" onclick="document.getElementById('maxusBg').classList.remove('open')">✕</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;flex-shrink:0">Shared 4WD vehicle. Book AM, PM, or Full Day.</div>
+    <!-- Reserve form (shown/hidden) -->
+    <div id="maxusFormWrap" style="display:none;background:#0a1628;border:1px solid #1a3a5c;border-radius:8px;padding:12px;margin-bottom:12px;flex-shrink:0">
+      <div style="font-weight:700;font-size:13px;color:#7dd3fc;margin-bottom:10px">New Reservation</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label style="font-size:11px;color:#888;display:block;margin-bottom:3px">Date</label>
+          <input type="date" id="maxusDate" style="width:100%;background:#0f2744;border:1px solid #1a6a9a;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:11px;color:#888;display:block;margin-bottom:3px">Slot</label>
+          <select id="maxusSlot" style="width:100%;background:#0f2744;border:1px solid #1a6a9a;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px;box-sizing:border-box">
+            <option value="AM">🌅 AM (Morning)</option>
+            <option value="PM">🌆 PM (Afternoon)</option>
+            <option value="FULL">☀ Full Day</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:11px;color:#888;display:block;margin-bottom:3px">Destination</label>
+        <input type="text" id="maxusDest" placeholder="e.g. Taiping, Customer Site" style="width:100%;background:#0f2744;border:1px solid #1a6a9a;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:11px;color:#888;display:block;margin-bottom:3px">Purpose <span style="color:#555">(optional)</span></label>
+        <input type="text" id="maxusPurpose" placeholder="e.g. Customer visit, site survey" style="width:100%;background:#0f2744;border:1px solid #1a6a9a;color:#e0e0e0;padding:6px 8px;border-radius:4px;font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="font-size:12px;color:#e94560;min-height:16px;margin-bottom:8px" id="maxusFormErr"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-confirm" onclick="saveMaxusReservation()" style="flex:1">Confirm Reservation</button>
+        <button class="btn-cancel" onclick="document.getElementById('maxusFormWrap').style.display='none'">Cancel</button>
+      </div>
+    </div>
+    <!-- List -->
+    <div style="overflow-y:auto;flex:1" id="maxusList"></div>
+    <div class="modal-actions" style="margin-top:10px;flex-shrink:0" id="maxusReserveAction">
+      <button class="btn-confirm" onclick="openMaxusForm()">+ Reserve Maxus</button>
+      <button class="btn-cancel" onclick="document.getElementById('maxusBg').classList.remove('open')">Close</button>
     </div>
   </div>
 </div>
@@ -1350,7 +1420,16 @@ function setupFirebaseListener() {
   // Clean up existing listeners before re-attaching
   if (fbRef) fbRef.off();
   if (fbReqRef) { fbReqRef.off(); fbReqRef = null; }
+  if (maxusRef) { maxusRef.off(); maxusRef = null; }
   isFirstSchedSnap = true;
+  // Maxus listener (all roles)
+  maxusRef = firebase.database().ref('maxus');
+  maxusRef.on('value', snap => {
+    maxusData = {};
+    snap.forEach(child => { maxusData[child.key] = child.val(); });
+    renderMaxusRow();
+    if (document.getElementById('maxusBg').classList.contains('open')) renderMaxusList();
+  });
   // Live request badge for admin
   if (currentRole === 'admin') {
     fbReqRef = firebase.database().ref('requests');
@@ -1455,6 +1534,8 @@ let currentReqFilter = 'new';
 let assigningReqKey = null;
 let assigningReq = null;
 let fbReqRef = null;
+let maxusRef = null;
+let maxusData = {};
 let editingReqKey = null;
 
 let currentReqFiles = [];
@@ -2242,6 +2323,7 @@ function renderDay() {
   lbl.value = data.holidayLabel || '';
 
   renderLeaveRow();
+  renderMaxusRow();
 
   const list = document.getElementById('jobsList');
   list.innerHTML = '';
@@ -3946,6 +4028,122 @@ function deleteVideo(idx) {
   }).catch(e => alert('Failed: ' + e.message));
 }
 
+// ---- Maxus Vehicle Reservation ----
+
+const MAXUS_SLOT_LABEL = { AM: '🌅 AM (Morning)', PM: '🌆 PM (Afternoon)', FULL: '☀ Full Day' };
+
+function getMaxusForDate(date) {
+  return Object.entries(maxusData)
+    .filter(([, v]) => v.date === date)
+    .map(([k, v]) => Object.assign({ _key: k }, v));
+}
+
+function maxusConflicts(date, slot, excludeKey) {
+  const existing = getMaxusForDate(date).filter(r => r._key !== excludeKey);
+  if (!existing.length) return false;
+  if (slot === 'FULL') return existing.length > 0;
+  if (existing.some(r => r.slot === 'FULL')) return true;
+  return existing.some(r => r.slot === slot);
+}
+
+function renderMaxusRow() {
+  const row = document.getElementById('maxusRow');
+  if (!row || !currentDay) return;
+  const rsvs = getMaxusForDate(currentDay);
+  if (!rsvs.length) { row.innerHTML = ''; return; }
+  const canBook = currentRole === 'admin' || currentRole === 'salesman';
+  row.innerHTML = '<span style="font-size:11px;color:#555;margin-right:4px">🚙</span>' +
+    rsvs.map(r => {
+      const cls = r.slot === 'FULL' ? 'full' : r.slot === 'AM' ? 'am' : 'pm';
+      const label = { AM:'AM', PM:'PM', FULL:'Full Day' }[r.slot] || r.slot;
+      return `<span class="maxus-slot ${cls}" onclick="openMaxus()">${label} · ${r.by}${r.destination ? ' → '+r.destination : ''}</span>`;
+    }).join('');
+}
+
+function openMaxus() {
+  document.getElementById('maxusFormWrap').style.display = 'none';
+  document.getElementById('maxusFormErr').textContent = '';
+  // Default date to currently viewed day
+  const dateInput = document.getElementById('maxusDate');
+  dateInput.value = currentDay || isoDate(new Date());
+  renderMaxusList();
+  const canBook = currentRole === 'admin' || currentRole === 'salesman';
+  document.getElementById('maxusReserveAction').style.display = canBook ? 'flex' : 'none';
+  document.getElementById('maxusBg').classList.add('open');
+}
+
+function openMaxusForm() {
+  document.getElementById('maxusFormWrap').style.display = 'block';
+  document.getElementById('maxusFormErr').textContent = '';
+  document.getElementById('maxusDest').value = '';
+  document.getElementById('maxusPurpose').value = '';
+  setTimeout(() => document.getElementById('maxusDate').focus(), 100);
+}
+
+function renderMaxusList() {
+  const list = document.getElementById('maxusList');
+  const today = isoDate(new Date());
+  const upcoming = Object.entries(maxusData)
+    .map(([k, v]) => Object.assign({ _key: k }, v))
+    .filter(r => r.date >= today)
+    .sort((a, b) => a.date === b.date ? (a.slot === 'AM' ? -1 : 1) : a.date.localeCompare(b.date));
+  if (!upcoming.length) {
+    list.innerHTML = '<div class="maxus-empty">No upcoming reservations.<br>Maxus is available!</div>';
+    return;
+  }
+  let lastDate = '';
+  list.innerHTML = upcoming.map(r => {
+    const cls = r.slot === 'FULL' ? 'full' : r.slot === 'AM' ? 'am' : 'pm';
+    const dateFmt = new Date(r.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    const dateHeader = r.date !== lastDate ? `<div style="font-size:11px;color:#555;margin:${lastDate?'14px':0} 0 4px">${dateFmt}</div>` : '';
+    lastDate = r.date;
+    const canDel = currentRole === 'admin' || (currentUser && r.byUid === currentUser.uid);
+    return dateHeader + `<div class="maxus-card">
+      <span class="maxus-card-slot ${r.slot}">${MAXUS_SLOT_LABEL[r.slot]||r.slot}</span>
+      ${canDel ? `<button class="maxus-card-del" onclick="cancelMaxusReservation('${r._key}')" title="Cancel">✕</button>` : ''}
+      <div class="maxus-card-meta">
+        ${r.destination ? `📍 ${r.destination}<br>` : ''}
+        ${r.purpose ? `📋 ${r.purpose}<br>` : ''}
+        👤 ${r.by || 'Unknown'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function saveMaxusReservation() {
+  const date = document.getElementById('maxusDate').value;
+  const slot = document.getElementById('maxusSlot').value;
+  const dest = document.getElementById('maxusDest').value.trim();
+  const purpose = document.getElementById('maxusPurpose').value.trim();
+  const errEl = document.getElementById('maxusFormErr');
+  if (!date) { errEl.textContent = 'Please select a date.'; return; }
+  if (!dest) { errEl.textContent = 'Please enter a destination.'; return; }
+  if (maxusConflicts(date, slot, null)) {
+    const existing = getMaxusForDate(date);
+    const blocker = existing.find(r => r.slot === 'FULL' || r.slot === slot);
+    errEl.textContent = `Maxus already booked ${MAXUS_SLOT_LABEL[blocker.slot]||blocker.slot} by ${blocker.by} on this date.`;
+    return;
+  }
+  errEl.textContent = '';
+  const by = document.getElementById('userName').textContent || '';
+  const record = { date, slot, destination: dest, by, byUid: currentUser ? currentUser.uid : null, ts: Date.now() };
+  if (purpose) record.purpose = purpose;
+  firebase.database().ref('maxus').push(record)
+    .then(() => {
+      document.getElementById('maxusFormWrap').style.display = 'none';
+      renderMaxusList();
+      renderMaxusRow();
+    })
+    .catch(e => { errEl.textContent = 'Failed: ' + e.message; });
+}
+
+function cancelMaxusReservation(key) {
+  if (!confirm('Cancel this Maxus reservation?')) return;
+  firebase.database().ref('maxus/' + key).remove()
+    .then(() => { renderMaxusList(); renderMaxusRow(); })
+    .catch(e => alert('Failed: ' + e.message));
+}
+
 // ---- Request form file attachments ----
 function triggerReqFileUpload() {
   document.getElementById('reqFileInput').value = '';
@@ -4519,7 +4717,7 @@ document.addEventListener('keydown', e => {
     document.getElementById('statusPickerMenu').classList.remove('open');
     statusPickerTarget = null;
     closeModal();
-    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg','videoBg','jobChangeBg','ibCommentBg','notifBg','searchBg'].forEach(id => {
+    ['waBg','commentBg','usersBg','svcReqBg','requestsBg','assignBg','rescheduleBg','tgSettingsBg','photoBg','filesBg','videoBg','maxusBg','jobChangeBg','ibCommentBg','notifBg','searchBg'].forEach(id => {
       document.getElementById(id).classList.remove('open');
     });
   }
