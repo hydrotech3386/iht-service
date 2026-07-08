@@ -4029,6 +4029,37 @@ function deleteVideo(idx) {
 }
 
 // ---- Maxus Vehicle Reservation ----
+function sendMaxusNotification(record, action) {
+  try {
+    const actorUid = currentUser ? currentUser.uid : null;
+    const actorName = document.getElementById('userName').textContent || 'Someone';
+    const dateFmt = new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    const slotLabel = { AM:'AM (Morning)', PM:'PM (Afternoon)', FULL:'Full Day' }[record.slot] || record.slot;
+    const actionLabel = action === 'booked' ? 'booked' : 'cancelled booking for';
+    const preview = `${actorName} ${actionLabel} Maxus ${slotLabel} on ${dateFmt}${record.destination ? ' → '+record.destination : ''}`;
+    const tgMsg = `🚙 <b>Maxus ${action === 'booked' ? 'Reserved' : 'Booking Cancelled'}</b>\n` +
+      `📅 ${dateFmt} · ${slotLabel}\n` +
+      (record.destination ? `📍 ${record.destination}\n` : '') +
+      (record.purpose ? `📋 ${record.purpose}\n` : '') +
+      `👤 By: ${actorName}`;
+    const notifTs = Date.now();
+    const notifKey = 'maxus_' + (actorUid || 'anon') + '_' + notifTs;
+    const notifData = { type: 'maxus', customer: '🚙 Maxus', preview, fromName: actorName, fromUid: actorUid, date: record.date, slot: record.slot, ts: notifTs, read: false };
+    firebase.database().ref('users').once('value').then(snap => {
+      const sentTg = new Set();
+      snap.forEach(child => {
+        const u = child.val(); const uid = child.key;
+        if (uid === actorUid) return; // don't notify yourself
+        if (u.role !== 'admin' && u.role !== 'salesman') return;
+        firebase.database().ref('notifications/' + uid + '/' + notifKey).set(notifData).catch(() => {});
+        if (u.telegramChatId && !sentTg.has(u.telegramChatId)) {
+          sentTg.add(u.telegramChatId);
+          sendTelegram(u.telegramChatId, tgMsg);
+        }
+      });
+    }).catch(() => {});
+  } catch(e) {}
+}
 
 const MAXUS_SLOT_LABEL = { AM: '🌅 AM (Morning)', PM: '🌆 PM (Afternoon)', FULL: '☀ Full Day' };
 
@@ -4133,14 +4164,20 @@ function saveMaxusReservation() {
       document.getElementById('maxusFormWrap').style.display = 'none';
       renderMaxusList();
       renderMaxusRow();
+      sendMaxusNotification(record, 'booked');
     })
     .catch(e => { errEl.textContent = 'Failed: ' + e.message; });
 }
 
 function cancelMaxusReservation(key) {
   if (!confirm('Cancel this Maxus reservation?')) return;
+  const record = maxusData[key];
   firebase.database().ref('maxus/' + key).remove()
-    .then(() => { renderMaxusList(); renderMaxusRow(); })
+    .then(() => {
+      renderMaxusList();
+      renderMaxusRow();
+      if (record) sendMaxusNotification(record, 'cancelled');
+    })
     .catch(e => alert('Failed: ' + e.message));
 }
 
@@ -4891,8 +4928,10 @@ function renderNotifications() {
       : new Date(n.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     const preview = (n.preview || '').slice(0, 80);
     const dayLabel = n.dayKey ? ' · ' + n.dayKey : '';
-    const icon = n.type === 'request' ? '📋' : n.type === 'assigned' ? '✅' : n.type === 'photo' ? '📷' : n.type === 'file' ? '📎' : n.type === 'location' ? '📍' : n.type === 'status' ? (n.statusValue === 'completed' ? '✅' : n.statusValue === 'in-progress' ? '🔧' : n.statusValue === 'cancelled' ? '❌' : '⏳') : '✍️';
-    const onclick = n.type === 'request'
+    const icon = n.type === 'maxus' ? '🚙' : n.type === 'request' ? '📋' : n.type === 'assigned' ? '✅' : n.type === 'photo' ? '📷' : n.type === 'file' ? '📎' : n.type === 'location' ? '📍' : n.type === 'status' ? (n.statusValue === 'completed' ? '✅' : n.statusValue === 'in-progress' ? '🔧' : n.statusValue === 'cancelled' ? '❌' : '⏳') : '✍️';
+    const onclick = n.type === 'maxus'
+      ? 'goToNotifMaxus(\'' + n.key + '\')'
+      : n.type === 'request'
       ? 'goToNotifRequest(\'' + n.key + '\',\'' + (n.reqKey||'') + '\')'
       : 'goToNotifJob(\'' + n.key + '\',\'' + (n.dayKey||'') + '\',' + (n.jobIdx||0) + ')';
     return '<div class="notif-item' + (n.read ? '' : ' unread') + '" onclick="' + onclick + '">'
@@ -4901,6 +4940,14 @@ function renderNotifications() {
       + '<div class="notif-time">' + timeAgo + dayLabel + '</div>'
       + '</div>';
   }).join('');
+}
+
+function goToNotifMaxus(key) {
+  if (currentUser && key) {
+    firebase.database().ref('notifications/' + currentUser.uid + '/' + key).update({ read: true }).catch(() => {});
+  }
+  closeNotifications();
+  openMaxus();
 }
 
 function goToNotifJob(key, dayKey, jobIdx) {
