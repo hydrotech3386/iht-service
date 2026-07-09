@@ -1706,7 +1706,8 @@ function loadRequests() {
         ? `<button class="btn-assign" onclick="editRequest('${r._key}')" style="background:#2980b9">✏️ Edit</button>` : '';
       const viewJobBtn = (r.status === 'scheduled' && r.scheduledTo && (isSalesman || currentRole === 'admin'))
         ? `<button class="btn-assign" onclick="goToScheduledRequest('${r.scheduledTo}')" style="background:#27ae60">📅 View Job</button>` : '';
-      const delBtn = (currentRole === 'admin' || canEdit)
+      const canDelete = currentRole === 'admin' || isOwn;
+      const delBtn = canDelete
         ? `<button class="btn-req-del" onclick="deleteRequest('${r._key}')" title="Remove">✕</button>` : '';
       const photoBtn = (currentRole === 'admin' || isOwn)
         ? `<button class="btn-assign" onclick="openPhotosForRequest('${r._key}')" style="background:#6c5ce7" title="Photos">📷</button>` : '';
