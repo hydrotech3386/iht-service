@@ -1,4 +1,6 @@
 *.json
+!firebase.json
+!functions/package.json
 *.pptx
 *.xlsx
 *.pdf
