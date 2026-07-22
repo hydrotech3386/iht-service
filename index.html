@@ -1032,7 +1032,8 @@
     <div class="users-list" id="usersList">
       <div style="color:#555;font-size:13px;text-align:center;padding:20px">Loading...</div>
     </div>
-    <div class="modal-actions" style="margin-top:12px">
+    <div class="modal-actions" style="margin-top:12px;justify-content:space-between">
+      <button class="btn-save" id="btnBackupNow" onclick="backupNow()" style="background:#1a6b3c">📥 Backup Now</button>
       <button class="btn-cancel" onclick="document.getElementById('usersBg').classList.remove('open')">Close</button>
     </div>
   </div>
@@ -1847,6 +1848,29 @@ function openManageUsers() {
   if (currentRole !== 'admin') return;
   document.getElementById('usersBg').classList.add('open');
   renderUsersList();
+}
+
+function backupNow() {
+  const btn = document.getElementById('btnBackupNow');
+  btn.disabled = true;
+  btn.textContent = '⏳ Backing up…';
+  firebase.database().ref('/').once('value').then(snap => {
+    const data = snap.val();
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `iht-service-backup-${dateStr}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    btn.disabled = false;
+    btn.textContent = '📥 Backup Now';
+  }).catch(e => {
+    alert('Backup failed: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '📥 Backup Now';
+  });
 }
 
 function getKnownSalesmanNames() {
