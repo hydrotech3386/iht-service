@@ -4,3 +4,4 @@
 *.pptx
 *.xlsx
 *.pdf
+!database.rules.json

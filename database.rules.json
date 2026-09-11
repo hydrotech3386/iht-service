@@ -1,0 +1,35 @@
+{
+  "rules": {
+    "schedule": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "users": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
+      }
+    },
+    "requests": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "auth != null",
+        ".indexOn": [
+          "ts"
+        ]
+      }
+    },
+    "maxus": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "maintenanceContracts": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

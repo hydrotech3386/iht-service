@@ -139,6 +139,28 @@
   .ib-toggle:hover{border-color:#f39c12}
   .ib-toggle.on{background:#f39c12;border-color:#f39c12;color:#000;font-weight:700}
   .ib-toggle input{display:none}
+  .mc-toggle:hover{border-color:#1abc9c}
+  .mc-toggle.on{background:#1abc9c;border-color:#1abc9c;color:#000;font-weight:700}
+  .mc-badge{display:inline-block;background:#1abc9c;color:#000;font-size:10px;font-weight:700;border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle;letter-spacing:.5px}
+  .btn-maint{background:#1abc9c;color:#000;position:relative}
+  .role-salesman .btn-maint,.role-technician .btn-maint{display:none}
+  .role-salesman #mcToggle,.role-salesman #mcIntervalRow{display:none}
+  .mc-item{background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+  .mc-item.overdue{border-color:#e94560}
+  .mc-item.due-soon{border-color:#f39c12}
+  .mc-item.ended{opacity:.55}
+  .mc-info{flex:1;min-width:200px}
+  .mc-cust{font-weight:700;font-size:14px;color:#fff}
+  .mc-meta{font-size:12px;color:#aaa;margin-top:2px}
+  .mc-pill{display:inline-block;font-size:11px;font-weight:700;border-radius:4px;padding:2px 8px;margin-top:6px}
+  .mc-pill.overdue{background:#e94560;color:#fff}
+  .mc-pill.due-soon{background:#f39c12;color:#000}
+  .mc-pill.ok{background:#0f3460;color:#4fc3f7}
+  .mc-pill.scheduled{background:#27ae60;color:#fff}
+  .mc-pill.pending{background:#555;color:#ddd}
+  .mc-pill.ended{background:#333;color:#999}
+  .mc-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .mc-actions button{border:none;border-radius:6px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer}
 
   /* Monthly summary modal */
   .summary-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
@@ -579,6 +601,7 @@
   <button class="btn-requests" id="btnRequests" onclick="openRequestsPanel()">📬 Requests<span class="req-count" id="reqCount" style="display:none">0</span></button>
   <button class="btn-copy" onclick="showWAPreview()">📋 Copy for WhatsApp</button>
   <button class="btn-summary" id="btnSummary" onclick="openSummary()" style="position:relative">📊 Internal Billing<span class="req-count" id="ibPendingCount" style="display:none">0</span></button>
+  <button class="btn-maint" id="btnMaint" onclick="openMaintenance()">🔧 Maintenance<span class="req-count" id="maintDueCount" style="display:none">0</span></button>
   <button class="btn-load" onclick="toggleHistory()">📁 History</button>
   <button class="btn-del-week" onclick="deleteWeek()">🗑 Delete Week</button>
   <button class="btn-backup" onclick="exportBackup()">⬇ Backup</button>
@@ -663,6 +686,22 @@
     <div class="form-row" id="ibAmountRow" style="display:none">
       <label>Billing Amount (RM)</label>
       <input type="number" id="fIBAmount" placeholder="0.00" min="0" step="0.01">
+    </div>
+    <div class="form-row">
+      <label class="ib-toggle mc-toggle" id="mcToggle" onclick="toggleMC()">
+        <input type="checkbox" id="fMaintenance">
+        <span id="mcLabel">Maintenance Contract</span>
+      </label>
+    </div>
+    <div class="form-row" id="mcIntervalRow" style="display:none">
+      <label>Maintenance Interval</label>
+      <select id="fMaintInterval">
+        <option value="3">Every 3 months</option>
+        <option value="4">Every 4 months</option>
+        <option value="6" selected>Every 6 months</option>
+        <option value="12">Every 12 months</option>
+      </select>
+      <div style="font-size:11px;color:#888;margin-top:4px">When this job is marked Completed, the next due date is set automatically and admins get a reminder 14 days before it.</div>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
@@ -794,6 +833,21 @@
       <button class="btn-confirm" id="ibExportPdfBtn" onclick="exportIBPDF()" style="background:#2980b9;display:none">📄 PDF</button>
       <button class="btn-confirm" id="ibExportCsvBtn" onclick="exportIBCSV()" style="background:#27ae60;display:none">⬇ CSV / Excel</button>
       <button class="btn-cancel" onclick="document.getElementById('summaryBg').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Maintenance Contracts Modal -->
+<div class="modal-bg" id="maintBg">
+  <div class="modal" style="max-width:720px">
+    <h2>🔧 Maintenance Contracts</h2>
+    <div class="month-selector" style="flex-wrap:wrap;gap:8px">
+      <span id="maintSummary" style="font-size:12px;color:#aaa"></span>
+      <label style="margin-left:auto;font-size:12px;color:#aaa;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="maintShowEnded" onchange="renderMaintenance()"> Show ended</label>
+    </div>
+    <div id="maintContent"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="document.getElementById('maintBg').classList.remove('open')">Close</button>
     </div>
   </div>
 </div>
@@ -1949,6 +2003,207 @@ function isTechOnJob(job) {
 let statusPickerTarget = null;
 const STATUS_ICONS = { 'pending': '⏳', 'in-progress': '🔧', 'completed': '✅', 'cancelled': '❌' };
 
+// ===================== MAINTENANCE CONTRACTS =====================
+// Contracts live at maintenanceContracts/{id}. A job links to one via job.maintenanceId.
+// Completing a linked job sets lastServiceDate + nextDue; the daily Cloud Function
+// (functions/index.js → maintenanceReminder) alerts admins 14 days before nextDue.
+let maintContracts = {};
+let maintRef = null;
+let maintPrefill = null;   // contract being scheduled from the panel → prefills the Add Job modal
+
+function setupMaintenanceListener() {
+  if (!fbReady || !currentUser) return;
+  if (maintRef) maintRef.off();
+  maintRef = firebase.database().ref('maintenanceContracts');
+  maintRef.on('value', snap => {
+    maintContracts = snap.val() || {};
+    updateMaintBadge();
+    if (document.getElementById('maintBg').classList.contains('open')) renderMaintenance();
+  });
+}
+
+function addMonthsISO(iso, months) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1 + months, 1);
+  const lastDay = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
+  dt.setDate(Math.min(d, lastDay));
+  return isoDate(dt);
+}
+
+function daysBetweenISO(fromIso, toIso) {
+  return Math.round((new Date(toIso + 'T00:00:00') - new Date(fromIso + 'T00:00:00')) / 86400000);
+}
+
+function fmtISO(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function maintStatus(c) {
+  if (c.active === false) return { cls: 'ended', label: 'Ended', sort: 5 };
+  if (c.nextJobDay) return { cls: 'scheduled', label: 'Next visit scheduled ' + fmtISO(c.nextJobDay), sort: 3 };
+  if (!c.nextDue) return { cls: 'pending', label: 'Awaiting first service', sort: 4 };
+  const days = daysBetweenISO(isoDate(new Date()), c.nextDue);
+  if (days < 0) return { cls: 'overdue', label: 'Overdue by ' + (-days) + ' day' + (days === -1 ? '' : 's'), sort: 0, days };
+  if (days <= 14) return { cls: 'due-soon', label: days === 0 ? 'Due today' : 'Due in ' + days + ' day' + (days === 1 ? '' : 's'), sort: 1, days };
+  return { cls: 'ok', label: 'Due in ' + days + ' days', sort: 2, days };
+}
+
+function updateMaintBadge() {
+  const badge = document.getElementById('maintDueCount');
+  if (!badge) return;
+  const n = Object.values(maintContracts).filter(c => { const st = maintStatus(c).cls; return st === 'overdue' || st === 'due-soon'; }).length;
+  badge.textContent = n > 99 ? '99+' : n;
+  badge.style.display = n > 0 ? 'flex' : 'none';
+}
+
+// Called from saveJob — keeps the contract record in step with the job form
+function syncMaintenanceFromJob(job, prevJob, dayKey) {
+  if (!fbReady || !currentUser) return;
+  const ref = firebase.database().ref('maintenanceContracts');
+  const now = Date.now();
+  if (job.maintenance) {
+    if (!job.maintenanceId) job.maintenanceId = job.jobId;
+    const id = job.maintenanceId;
+    const existing = maintContracts[id] || {};
+    const interval = job.maintenanceInterval || existing.intervalMonths || 6;
+    const upd = {
+      customer: job.customer || '', contact: job.contact || '', address: job.address || '',
+      salesman: job.salesman || '', salesmanUid: job.salesmanUid || null, desc: job.desc || '', team: job.team || '',
+      intervalMonths: interval, active: true, updatedAt: now
+    };
+    if (!existing.createdAt) upd.createdAt = now;
+    if ((job.status || 'pending') === 'completed') {
+      if (!existing.lastServiceDate || dayKey >= existing.lastServiceDate) {
+        upd.lastServiceDate = dayKey;
+        upd.nextDue = addMonthsISO(dayKey, interval);
+        if (existing.nextDue !== upd.nextDue) upd.reminderSentFor = null;
+      }
+      if (existing.nextJobDay === dayKey) upd.nextJobDay = null;
+    } else {
+      upd.nextJobDay = dayKey;
+      if (existing.lastServiceDate && existing.intervalMonths !== interval) upd.nextDue = addMonthsISO(existing.lastServiceDate, interval);
+    }
+    ref.child(id).update(upd).catch(() => {});
+  } else if (prevJob && prevJob.maintenance && prevJob.maintenanceId) {
+    // Maintenance unticked on the job → contract ends (can be reactivated from the panel)
+    ref.child(prevJob.maintenanceId).update({ active: false, updatedAt: now }).catch(() => {});
+  }
+}
+
+// Called from setJobStatus — completion starts the countdown to the next visit
+function updateMaintenanceOnStatus(job, dayKey, newStatus) {
+  if (!fbReady) return;
+  const id = job.maintenanceId || job.jobId;
+  const c = maintContracts[id];
+  if (!c) return;
+  const interval = c.intervalMonths || job.maintenanceInterval || 6;
+  const upd = { updatedAt: Date.now() };
+  if (newStatus === 'completed') {
+    if (c.lastServiceDate && dayKey < c.lastServiceDate) return;   // an older visit — don't move the clock backwards
+    upd.lastServiceDate = dayKey;
+    upd.nextDue = addMonthsISO(dayKey, interval);
+    upd.reminderSentFor = null;
+    upd.active = true;
+    if (c.nextJobDay === dayKey) upd.nextJobDay = null;
+  } else if (c.lastServiceDate === dayKey) {
+    upd.nextJobDay = dayKey;   // completion undone — back to "scheduled"
+  } else return;
+  firebase.database().ref('maintenanceContracts/' + id).update(upd).catch(() => {});
+}
+
+function openMaintenance() {
+  document.getElementById('maintBg').classList.add('open');
+  renderMaintenance();
+}
+
+function renderMaintenance() {
+  const showEnded = document.getElementById('maintShowEnded').checked;
+  const items = Object.keys(maintContracts)
+    .map(id => Object.assign({ id }, maintContracts[id], { st: maintStatus(maintContracts[id]) }))
+    .filter(c => showEnded || c.active !== false)
+    .sort((a, b) => a.st.sort - b.st.sort || (a.nextDue || '9').localeCompare(b.nextDue || '9') || (a.customer || '').localeCompare(b.customer || ''));
+  const active = items.filter(c => c.active !== false);
+  const overdue = active.filter(c => c.st.cls === 'overdue').length;
+  const dueSoon = active.filter(c => c.st.cls === 'due-soon').length;
+  document.getElementById('maintSummary').textContent =
+    active.length + ' active contract' + (active.length === 1 ? '' : 's') +
+    (overdue ? ' · ' + overdue + ' overdue' : '') + (dueSoon ? ' · ' + dueSoon + ' due within 14 days' : '');
+  const el = document.getElementById('maintContent');
+  if (!items.length) {
+    el.innerHTML = '<div style="text-align:center;color:#666;padding:30px 0">No maintenance contracts yet.<br><span style="font-size:12px">Tick <b>Maintenance Contract</b> when adding a job to start tracking it here.</span></div>';
+    return;
+  }
+  const isAdmin = currentRole === 'admin';
+  el.innerHTML = items.map(c => {
+    const st = c.st;
+    const actions = [];
+    if (isAdmin && c.active !== false && st.cls !== 'scheduled')
+      actions.push(`<button style="background:#27ae60;color:#fff" onclick="scheduleMaintVisit('${c.id}')">📅 Schedule visit</button>`);
+    if (st.cls === 'scheduled')
+      actions.push(`<button style="background:#0f3460;color:#4fc3f7" onclick="goToMaintJob('${c.nextJobDay}')">👁 View job</button>`);
+    if (isAdmin && c.active !== false)
+      actions.push(`<button style="background:#555;color:#fff" onclick="endMaintContract('${c.id}')">⏹ End</button>`);
+    if (isAdmin && c.active === false) {
+      actions.push(`<button style="background:#0f3460;color:#fff" onclick="reactivateMaintContract('${c.id}')">▶ Reactivate</button>`);
+      actions.push(`<button style="background:#e94560;color:#fff" onclick="deleteMaintContract('${c.id}')">🗑 Delete</button>`);
+    }
+    return `<div class="mc-item ${st.cls}">
+      <div class="mc-info">
+        <div class="mc-cust">${c.customer || 'Customer'}${c.salesman ? ' <span style="color:#aaa;font-weight:400">(' + c.salesman + ')</span>' : ''}</div>
+        ${c.address ? `<div class="mc-meta">📍 ${c.address}</div>` : ''}
+        ${c.contact ? `<div class="mc-meta">📞 ${c.contact}</div>` : ''}
+        ${c.desc ? `<div class="mc-meta" style="color:#888">${splitTasks(c.desc).join(' | ').slice(0, 140)}</div>` : ''}
+        <div class="mc-meta">🔁 Every ${c.intervalMonths} months · Last service: <b>${fmtISO(c.lastServiceDate)}</b> · Next due: <b>${fmtISO(c.nextDue)}</b></div>
+        <span class="mc-pill ${st.cls}">${st.label}</span>
+      </div>
+      <div class="mc-actions">${actions.join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+function scheduleMaintVisit(id) {
+  const c = maintContracts[id];
+  if (!c || currentRole !== 'admin') return;
+  const today = isoDate(new Date());
+  let target = c.nextDue && c.nextDue > today ? c.nextDue : today;
+  const d = new Date(target + 'T00:00:00');
+  if (d.getDay() === 0) { d.setDate(d.getDate() + 1); target = isoDate(d); }   // schedule is Mon–Sat
+  document.getElementById('maintBg').classList.remove('open');
+  state.weekStart = getMonday(d);
+  currentDay = target;
+  render();
+  maintPrefill = Object.assign({ id }, c);
+  openModal();
+}
+
+function goToMaintJob(dayKey) {
+  document.getElementById('maintBg').classList.remove('open');
+  if (!dayKey) return;
+  state.weekStart = getMonday(new Date(dayKey + 'T00:00:00'));
+  currentDay = dayKey;
+  render();
+}
+
+function endMaintContract(id) {
+  if (currentRole !== 'admin' || !maintContracts[id]) return;
+  if (!confirm('End maintenance contract for ' + (maintContracts[id].customer || 'this customer') + '?\nNo more reminders will be sent.')) return;
+  firebase.database().ref('maintenanceContracts/' + id).update({ active: false, nextJobDay: null, updatedAt: Date.now() }).catch(() => {});
+}
+
+function reactivateMaintContract(id) {
+  if (currentRole !== 'admin' || !maintContracts[id]) return;
+  firebase.database().ref('maintenanceContracts/' + id).update({ active: true, updatedAt: Date.now() }).catch(() => {});
+}
+
+function deleteMaintContract(id) {
+  if (currentRole !== 'admin' || !maintContracts[id]) return;
+  if (!confirm('Permanently delete this contract record?')) return;
+  firebase.database().ref('maintenanceContracts/' + id).remove().catch(() => {});
+}
+// =================== END MAINTENANCE CONTRACTS ===================
+
 function openStatusPicker(event, idx) {
   event.stopPropagation();
   const job = getDayData(currentDay).jobs[idx];
@@ -1989,6 +2244,7 @@ function setJobStatus(idx, dayKey, newStatus) {
   if ((job.status || 'pending') === newStatus) return;
   job.status = newStatus;
   saveJobField(dayKey, idx, 'status', newStatus);
+  if (job.maintenanceId || job.maintenance) updateMaintenanceOnStatus(job, dayKey, newStatus);
   renderDay();
 
   const actorName = (document.getElementById('userName') || {}).textContent || 'Someone';
@@ -2185,6 +2441,7 @@ function init() {
           updateUserInfo(name, role);
           setupFirebaseListener();
           setupNotificationListener();
+          setupMaintenanceListener();
         }
       });
     });
@@ -2410,7 +2667,7 @@ function renderDay() {
     card.innerHTML = `
       <div class="job-num">${displayIdx+1}</div>
       <div class="job-body">
-        <div class="job-team">${job.team || ''}${showIB ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}</div>
+        <div class="job-team">${job.team || ''}${showIB ? `<span class="ib-badge">INT BILL${job.ibAmount ? ' RM'+Number(job.ibAmount).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}</span>` : ''}${job.maintenance ? `<span class="mc-badge" title="Maintenance contract — every ${job.maintenanceInterval || '?'} months">🔧 MAINT ${job.maintenanceInterval || ''}M</span>` : ''}</div>
         <div class="job-customer">${job.customer || ''}${job.contact ? ' <span class="contact">'+job.contact+'</span>' : ''}${job.address ? ' '+job.address : ''}${job.salesman ? ' ('+job.salesman+')' : ''}</div>
         ${job.desc ? `<div class="job-desc">${formatDesc(job.desc)}</div>` : ''}
         <span class="status-badge ${status}${canClickStatus?' clickable':''}" ${canClickStatus?`onclick="openStatusPicker(event,${idx})"`:''}>${statusLabel}</span>
@@ -2496,12 +2753,14 @@ function openModal(editIdx) {
     document.getElementById('fDesc').value = job.desc || '';
     document.getElementById('modalTitle').textContent = `Edit Job ${editIdx+1}`;
   } else {
-    selectedMembers = [];
-    document.getElementById('fCustomer').value = '';
-    document.getElementById('fContact').value = '';
-    document.getElementById('fAddress').value = '';
-    document.getElementById('fDesc').value = '';
-    document.getElementById('modalTitle').textContent = 'Add Job';
+    // maintPrefill is set when scheduling the next visit from the Maintenance panel
+    const pf = maintPrefill || {};
+    selectedMembers = (pf.team || '').split(',').map(s => s.trim()).filter(Boolean);
+    document.getElementById('fCustomer').value = pf.customer || '';
+    document.getElementById('fContact').value = pf.contact || '';
+    document.getElementById('fAddress').value = pf.address || '';
+    document.getElementById('fDesc').value = pf.desc || '';
+    document.getElementById('modalTitle').textContent = maintPrefill ? 'Schedule Maintenance Visit' : 'Add Job';
   }
   const isIB = editingJob !== null ? !!data.jobs[editingJob.jobIdx].internalBilling : false;
   const ibAmt = editingJob !== null ? (data.jobs[editingJob.jobIdx].ibAmount || '') : '';
@@ -2511,10 +2770,12 @@ function openModal(editIdx) {
   const tog = document.getElementById('ibToggle');
   tog.classList.toggle('on', isIB);
   document.getElementById('ibLabel').textContent = isIB ? '✔ Internal Billing' : 'Internal Billing';
+  const mcSrc = editingJob !== null ? data.jobs[editingJob.jobIdx] : maintPrefill;
+  setMCToggle(!!(mcSrc && (editingJob !== null ? mcSrc.maintenance : true)), mcSrc ? (mcSrc.maintenanceInterval || mcSrc.intervalMonths || 6) : 6);
   document.getElementById('manageMembersPanel').style.display = 'none';
   document.getElementById('manageSalesmenPanel').style.display = 'none';
   renderMemberGrid(selectedMembers);
-  const selectedSalesman = editingJob !== null ? (data.jobs[editingJob.jobIdx].salesman || '') : '';
+  const selectedSalesman = editingJob !== null ? (data.jobs[editingJob.jobIdx].salesman || '') : (maintPrefill ? maintPrefill.salesman || '' : '');
   renderSalesmanGrid(selectedSalesman);
   modal.classList.add('open');
   document.getElementById('fCustomer').focus();
@@ -2529,6 +2790,19 @@ function toggleIB() {
   document.getElementById('ibLabel').textContent = cb.checked ? '✔ Internal Billing' : 'Internal Billing';
   document.getElementById('ibAmountRow').style.display = cb.checked ? 'block' : 'none';
   if (cb.checked) document.getElementById('fIBAmount').focus();
+}
+
+function setMCToggle(on, interval) {
+  document.getElementById('fMaintenance').checked = on;
+  document.getElementById('mcToggle').classList.toggle('on', on);
+  document.getElementById('mcLabel').textContent = on ? '✔ Maintenance Contract' : 'Maintenance Contract';
+  document.getElementById('mcIntervalRow').style.display = on ? 'block' : 'none';
+  document.getElementById('fMaintInterval').value = String(interval || 6);
+}
+
+function toggleMC() {
+  const cb = document.getElementById('fMaintenance');
+  setMCToggle(!cb.checked, document.getElementById('fMaintInterval').value);
 }
 
 function renderMemberGrid(selectedMembers) {
@@ -2690,6 +2964,7 @@ function getLastTeam() {
 function closeModal() {
   document.getElementById('modalBg').classList.remove('open');
   editingJob = null;
+  maintPrefill = null;
 }
 
 function saveJob() {
@@ -2705,6 +2980,9 @@ function saveJob() {
     internalBilling: document.getElementById('fInternalBilling').checked,
     ibAmount: document.getElementById('fInternalBilling').checked ? (parseFloat(document.getElementById('fIBAmount').value) || 0) : 0,
     desc: document.getElementById('fDesc').value.trim(),
+    maintenance: document.getElementById('fMaintenance').checked,
+    maintenanceInterval: document.getElementById('fMaintenance').checked ? parseInt(document.getElementById('fMaintInterval').value, 10) : null,
+    maintenanceId: (existing && existing.maintenanceId) || (maintPrefill && maintPrefill.id) || null,
     jobId: (existing && existing.jobId) || Date.now().toString(36) + Math.random().toString(36).slice(2),
     status: existing ? (existing.status || 'pending') : 'pending',
     comments: existing ? (existing.comments || []) : []
@@ -2714,6 +2992,7 @@ function saveJob() {
   } else {
     data.jobs.push(job);
   }
+  syncMaintenanceFromJob(job, existing, currentDay);
   closeModal();
   saveDayJobs(currentDay);
   renderDay();
@@ -2765,6 +3044,9 @@ function confirmReschedule() {
   // Navigate to the new week/day
   const [y,m,d] = newDate.split('-').map(Number);
   const oldDay = currentDay;
+  if (job.maintenanceId && maintContracts[job.maintenanceId] && maintContracts[job.maintenanceId].nextJobDay === oldDay) {
+    firebase.database().ref('maintenanceContracts/' + job.maintenanceId).update({ nextJobDay: newDate, updatedAt: Date.now() }).catch(() => {});
+  }
   state.weekStart = getMonday(new Date(y, m-1, d));
   currentDay = newDate;
   // Targeted write for both affected days (fast, avoids overwriting concurrent changes)
@@ -2783,6 +3065,13 @@ function confirmReschedule() {
 function deleteJob(idx) {
   if (!confirm('Delete this job?')) return;
   const data = getDayData(currentDay);
+  const victim = data.jobs[idx];
+  if (victim && victim.maintenanceId && maintContracts[victim.maintenanceId]) {
+    const c = maintContracts[victim.maintenanceId];
+    const cref = firebase.database().ref('maintenanceContracts/' + victim.maintenanceId);
+    if (!c.lastServiceDate && victim.maintenanceId === victim.jobId) cref.remove().catch(() => {});   // contract never serviced — drop it
+    else if (c.nextJobDay === currentDay) cref.update({ nextJobDay: null, updatedAt: Date.now() }).catch(() => {});
+  }
   data.jobs.splice(idx, 1);
   saveDayJobs(currentDay);
   renderDay();
@@ -4951,9 +5240,11 @@ function renderNotifications() {
       : new Date(n.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     const preview = (n.preview || '').slice(0, 80);
     const dayLabel = n.dayKey ? ' · ' + n.dayKey : '';
-    const icon = n.type === 'maxus' ? '🚙' : n.type === 'request' ? '📋' : n.type === 'assigned' ? '✅' : n.type === 'photo' ? '📷' : n.type === 'file' ? '📎' : n.type === 'location' ? '📍' : n.type === 'status' ? (n.statusValue === 'completed' ? '✅' : n.statusValue === 'in-progress' ? '🔧' : n.statusValue === 'cancelled' ? '❌' : '⏳') : '✍️';
+    const icon = n.type === 'maxus' ? '🚙' : n.type === 'maintenance' ? '🔧' : n.type === 'request' ? '📋' : n.type === 'assigned' ? '✅' : n.type === 'photo' ? '📷' : n.type === 'file' ? '📎' : n.type === 'location' ? '📍' : n.type === 'status' ? (n.statusValue === 'completed' ? '✅' : n.statusValue === 'in-progress' ? '🔧' : n.statusValue === 'cancelled' ? '❌' : '⏳') : '✍️';
     const onclick = n.type === 'maxus'
       ? 'goToNotifMaxus(\'' + n.key + '\')'
+      : n.type === 'maintenance'
+      ? 'goToNotifMaint(\'' + n.key + '\')'
       : n.type === 'request'
       ? 'goToNotifRequest(\'' + n.key + '\',\'' + (n.reqKey||'') + '\')'
       : 'goToNotifJob(\'' + n.key + '\',\'' + (n.dayKey||'') + '\',' + (n.jobIdx||0) + ')';
@@ -4963,6 +5254,14 @@ function renderNotifications() {
       + '<div class="notif-time">' + timeAgo + dayLabel + '</div>'
       + '</div>';
   }).join('');
+}
+
+function goToNotifMaint(key) {
+  if (currentUser && key) {
+    firebase.database().ref('notifications/' + currentUser.uid + '/' + key).update({ read: true }).catch(() => {});
+  }
+  closeNotifications();
+  openMaintenance();
 }
 
 function goToNotifMaxus(key) {
