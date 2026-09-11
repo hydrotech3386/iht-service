@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Scheduled jobs for Service Schedule: nightly RTDB backup + daily maintenance-contract reminders",
   "main": "index.js",
-  "engines": { "node": "20" },
+  "engines": { "node": "22" },
   "scripts": {
     "deploy": "firebase deploy --only functions"
   },
