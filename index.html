@@ -358,6 +358,13 @@
   /* Maxus */
   .btn-maxus{background:#0f3460;border:1px solid #1a6a9a;color:#7dd3fc}
   .btn-maxus:hover{background:#1a6a9a;color:#fff}
+  .btn-sorento{border-color:#2e8b57;color:#86efac}
+  .btn-sorento:hover{background:#2e8b57;color:#fff}
+  .vehicle-tabs{display:flex;gap:6px;margin-bottom:10px;flex-shrink:0}
+  .vehicle-tab{flex:1;background:#0f2744;border:1px solid #1a3a5c;color:#aaa;border-radius:6px;padding:7px 10px;font-size:13px;font-weight:600;cursor:pointer}
+  .vehicle-tab.active{background:#1a6a9a;border-color:#1a6a9a;color:#fff}
+  .vehicle-tab.active.sorento{background:#2e8b57;border-color:#2e8b57}
+  .maxus-slot .veh-ico{opacity:.8}
   .maxus-row{margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .maxus-slot{display:inline-flex;align-items:center;gap:6px;background:#0f2744;border:1px solid #1a6a9a;border-radius:6px;padding:4px 10px;font-size:12px;color:#7dd3fc;cursor:pointer}
   .maxus-slot:hover{background:#1a3a5c}
@@ -594,7 +601,8 @@
   <button class="btn-add" onclick="openModal()">+ Add Job</button>
   <button class="btn-my-jobs" id="btnMyJobs" onclick="toggleMyJobs()">👤 My Jobs</button>
   <button class="btn-search" onclick="openSearch()">🔍 Search</button>
-  <button class="btn-maxus" onclick="openMaxus()">🚙 Maxus</button>
+  <button class="btn-maxus" onclick="openMaxus('maxus')">🚙 Maxus</button>
+  <button class="btn-maxus btn-sorento" onclick="openMaxus('sorento')">🚗 Sorento</button>
   <button class="btn-notif" id="btnNotif" onclick="openNotifications()" style="display:none">📥 Inbox<span class="req-count" id="notifBadge" style="display:none;background:#e94560;color:#fff;margin-left:4px">0</span></button>
 
   <button class="btn-request" onclick="openServiceRequest()">📋 New Request</button>
@@ -1003,10 +1011,11 @@
 <div class="modal-bg" id="maxusBg" onclick="if(event.target===this)document.getElementById('maxusBg').classList.remove('open')">
   <div class="modal" style="max-width:480px;max-height:85vh;display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-shrink:0">
-      <h2 style="margin:0">🚙 Maxus Reservation</h2>
+      <h2 style="margin:0" id="maxusTitle">🚙 Maxus Reservation</h2>
       <button class="btn-cancel" onclick="document.getElementById('maxusBg').classList.remove('open')">✕</button>
     </div>
-    <div style="font-size:12px;color:#888;margin-bottom:12px;flex-shrink:0">Shared 4WD vehicle. Book AM, PM, or Full Day.</div>
+    <div class="vehicle-tabs" id="vehicleTabs"></div>
+    <div style="font-size:12px;color:#888;margin-bottom:12px;flex-shrink:0" id="maxusDesc">Shared 4WD vehicle. Book AM, PM, or Full Day.</div>
     <!-- Reserve form (shown/hidden) -->
     <div id="maxusFormWrap" style="display:none;background:#0a1628;border:1px solid #1a3a5c;border-radius:8px;padding:12px;margin-bottom:12px;flex-shrink:0">
       <div style="font-weight:700;font-size:13px;color:#7dd3fc;margin-bottom:10px">New Reservation</div>
@@ -1041,7 +1050,7 @@
     <!-- List -->
     <div style="overflow-y:auto;flex:1" id="maxusList"></div>
     <div class="modal-actions" style="margin-top:10px;flex-shrink:0" id="maxusReserveAction">
-      <button class="btn-confirm" onclick="openMaxusForm()">+ Reserve Maxus</button>
+      <button class="btn-confirm" onclick="openMaxusForm()" id="maxusReserveBtn">+ Reserve Maxus</button>
       <button class="btn-cancel" onclick="document.getElementById('maxusBg').classList.remove('open')">Close</button>
     </div>
   </div>
@@ -4340,7 +4349,16 @@ function deleteVideo(idx) {
   }).catch(e => alert('Failed: ' + e.message));
 }
 
-// ---- Maxus Vehicle Reservation ----
+// ---- Vehicle Reservation (Maxus, Kia Sorento) ----
+// All reservations share the `maxus` DB path; each record carries `vehicle` (records without it are the original Maxus bookings).
+const VEHICLES = {
+  maxus:   { name: 'Maxus',       icon: '🚙', desc: 'Shared 4WD vehicle. Book AM, PM, or Full Day.' },
+  sorento: { name: 'Kia Sorento', icon: '🚗', desc: 'Shared SUV. Book AM, PM, or Full Day.' }
+};
+let currentVehicle = 'maxus';
+function recVehicle(r) { return (r && r.vehicle && VEHICLES[r.vehicle]) ? r.vehicle : 'maxus'; }
+function vehicleOf(key) { return VEHICLES[key] || VEHICLES.maxus; }
+
 function sendMaxusNotification(record, action) {
   try {
     const actorUid = currentUser ? currentUser.uid : null;
@@ -4348,15 +4366,16 @@ function sendMaxusNotification(record, action) {
     const dateFmt = new Date(record.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
     const slotLabel = { AM:'AM (Morning)', PM:'PM (Afternoon)', FULL:'Full Day' }[record.slot] || record.slot;
     const actionLabel = action === 'booked' ? 'booked' : 'cancelled booking for';
-    const preview = `${actorName} ${actionLabel} Maxus ${slotLabel} on ${dateFmt}${record.destination ? ' → '+record.destination : ''}`;
-    const tgMsg = `🚙 <b>Maxus ${action === 'booked' ? 'Reserved' : 'Booking Cancelled'}</b>\n` +
+    const veh = vehicleOf(recVehicle(record));
+    const preview = `${actorName} ${actionLabel} ${veh.name} ${slotLabel} on ${dateFmt}${record.destination ? ' → '+record.destination : ''}`;
+    const tgMsg = `${veh.icon} <b>${veh.name} ${action === 'booked' ? 'Reserved' : 'Booking Cancelled'}</b>\n` +
       `📅 ${dateFmt} · ${slotLabel}\n` +
       (record.destination ? `📍 ${record.destination}\n` : '') +
       (record.purpose ? `📋 ${record.purpose}\n` : '') +
       `👤 By: ${actorName}`;
     const notifTs = Date.now();
     const notifKey = 'maxus_' + (actorUid || 'anon') + '_' + notifTs;
-    const notifData = { type: 'maxus', customer: '🚙 Maxus', preview, fromName: actorName, fromUid: actorUid, date: record.date, slot: record.slot, ts: notifTs, read: false };
+    const notifData = { type: 'maxus', vehicle: recVehicle(record), customer: veh.icon + ' ' + veh.name, preview, fromName: actorName, fromUid: actorUid, date: record.date, slot: record.slot, ts: notifTs, read: false };
     firebase.database().ref('users').once('value').then(snap => {
       const sentTg = new Set();
       snap.forEach(child => {
@@ -4375,14 +4394,15 @@ function sendMaxusNotification(record, action) {
 
 const MAXUS_SLOT_LABEL = { AM: '🌅 AM (Morning)', PM: '🌆 PM (Afternoon)', FULL: '☀ Full Day' };
 
-function getMaxusForDate(date) {
+function getMaxusForDate(date, vehicle) {
+  const veh = vehicle || currentVehicle;
   return Object.entries(maxusData)
-    .filter(([, v]) => v.date === date)
+    .filter(([, v]) => v.date === date && recVehicle(v) === veh)
     .map(([k, v]) => Object.assign({ _key: k }, v));
 }
 
-function maxusConflicts(date, slot, excludeKey) {
-  const existing = getMaxusForDate(date).filter(r => r._key !== excludeKey);
+function maxusConflicts(date, slot, excludeKey, vehicle) {
+  const existing = getMaxusForDate(date, vehicle).filter(r => r._key !== excludeKey);
   if (!existing.length) return false;
   if (slot === 'FULL') return existing.length > 0;
   if (existing.some(r => r.slot === 'FULL')) return true;
@@ -4392,18 +4412,35 @@ function maxusConflicts(date, slot, excludeKey) {
 function renderMaxusRow() {
   const row = document.getElementById('maxusRow');
   if (!row || !currentDay) return;
-  const rsvs = getMaxusForDate(currentDay);
+  const rsvs = Object.keys(VEHICLES).flatMap(v => getMaxusForDate(currentDay, v));
   if (!rsvs.length) { row.innerHTML = ''; return; }
-  const canBook = currentRole === 'admin' || currentRole === 'salesman';
-  row.innerHTML = '<span style="font-size:11px;color:#555;margin-right:4px">🚙</span>' +
-    rsvs.map(r => {
+  row.innerHTML = rsvs.map(r => {
       const cls = r.slot === 'FULL' ? 'full' : r.slot === 'AM' ? 'am' : 'pm';
       const label = { AM:'AM', PM:'PM', FULL:'Full Day' }[r.slot] || r.slot;
-      return `<span class="maxus-slot ${cls}" onclick="openMaxus()">${label} · ${r.by}${r.destination ? ' → '+r.destination : ''}</span>`;
+      const vk = recVehicle(r), veh = vehicleOf(vk);
+      return `<span class="maxus-slot ${cls}" onclick="openMaxus('${vk}')" title="${veh.name}"><span class="veh-ico">${veh.icon}</span> ${label} · ${r.by}${r.destination ? ' → '+r.destination : ''}</span>`;
     }).join('');
 }
 
-function openMaxus() {
+function setVehicle(vehicle) {
+  currentVehicle = VEHICLES[vehicle] ? vehicle : 'maxus';
+  const veh = vehicleOf(currentVehicle);
+  document.getElementById('maxusTitle').textContent = `${veh.icon} ${veh.name} Reservation`;
+  document.getElementById('maxusDesc').textContent = veh.desc;
+  document.getElementById('maxusReserveBtn').textContent = `+ Reserve ${veh.name}`;
+  document.getElementById('vehicleTabs').innerHTML = Object.keys(VEHICLES).map(k =>
+    `<button class="vehicle-tab ${k}${k === currentVehicle ? ' active' : ''}" onclick="switchVehicle('${k}')">${VEHICLES[k].icon} ${VEHICLES[k].name}</button>`).join('');
+}
+
+function switchVehicle(vehicle) {
+  setVehicle(vehicle);
+  document.getElementById('maxusFormWrap').style.display = 'none';
+  document.getElementById('maxusFormErr').textContent = '';
+  renderMaxusList();
+}
+
+function openMaxus(vehicle) {
+  setVehicle(vehicle || currentVehicle);
   document.getElementById('maxusFormWrap').style.display = 'none';
   document.getElementById('maxusFormErr').textContent = '';
   // Default date to currently viewed day
@@ -4428,10 +4465,10 @@ function renderMaxusList() {
   const today = isoDate(new Date());
   const upcoming = Object.entries(maxusData)
     .map(([k, v]) => Object.assign({ _key: k }, v))
-    .filter(r => r.date >= today)
+    .filter(r => r.date >= today && recVehicle(r) === currentVehicle)
     .sort((a, b) => a.date === b.date ? (a.slot === 'AM' ? -1 : 1) : a.date.localeCompare(b.date));
   if (!upcoming.length) {
-    list.innerHTML = '<div class="maxus-empty">No upcoming reservations.<br>Maxus is available!</div>';
+    list.innerHTML = `<div class="maxus-empty">No upcoming reservations.<br>${vehicleOf(currentVehicle).name} is available!</div>`;
     return;
   }
   let lastDate = '';
@@ -4464,12 +4501,12 @@ function saveMaxusReservation() {
   if (maxusConflicts(date, slot, null)) {
     const existing = getMaxusForDate(date);
     const blocker = existing.find(r => r.slot === 'FULL' || r.slot === slot);
-    errEl.textContent = `Maxus already booked ${MAXUS_SLOT_LABEL[blocker.slot]||blocker.slot} by ${blocker.by} on this date.`;
+    errEl.textContent = `${vehicleOf(currentVehicle).name} already booked ${MAXUS_SLOT_LABEL[blocker.slot]||blocker.slot} by ${blocker.by} on this date.`;
     return;
   }
   errEl.textContent = '';
   const by = document.getElementById('userName').textContent || '';
-  const record = { date, slot, destination: dest, by, byUid: currentUser ? currentUser.uid : null, ts: Date.now() };
+  const record = { vehicle: currentVehicle, date, slot, destination: dest, by, byUid: currentUser ? currentUser.uid : null, ts: Date.now() };
   if (purpose) record.purpose = purpose;
   firebase.database().ref('maxus').push(record)
     .then(() => {
@@ -4482,8 +4519,8 @@ function saveMaxusReservation() {
 }
 
 function cancelMaxusReservation(key) {
-  if (!confirm('Cancel this Maxus reservation?')) return;
   const record = maxusData[key];
+  if (!confirm(`Cancel this ${vehicleOf(recVehicle(record)).name} reservation?`)) return;
   firebase.database().ref('maxus/' + key).remove()
     .then(() => {
       renderMaxusList();
@@ -5240,7 +5277,7 @@ function renderNotifications() {
       : new Date(n.ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     const preview = (n.preview || '').slice(0, 80);
     const dayLabel = n.dayKey ? ' · ' + n.dayKey : '';
-    const icon = n.type === 'maxus' ? '🚙' : n.type === 'maintenance' ? '🔧' : n.type === 'request' ? '📋' : n.type === 'assigned' ? '✅' : n.type === 'photo' ? '📷' : n.type === 'file' ? '📎' : n.type === 'location' ? '📍' : n.type === 'status' ? (n.statusValue === 'completed' ? '✅' : n.statusValue === 'in-progress' ? '🔧' : n.statusValue === 'cancelled' ? '❌' : '⏳') : '✍️';
+    const icon = n.type === 'maxus' ? vehicleOf(n.vehicle).icon : n.type === 'maintenance' ? '🔧' : n.type === 'request' ? '📋' : n.type === 'assigned' ? '✅' : n.type === 'photo' ? '📷' : n.type === 'file' ? '📎' : n.type === 'location' ? '📍' : n.type === 'status' ? (n.statusValue === 'completed' ? '✅' : n.statusValue === 'in-progress' ? '🔧' : n.statusValue === 'cancelled' ? '❌' : '⏳') : '✍️';
     const onclick = n.type === 'maxus'
       ? 'goToNotifMaxus(\'' + n.key + '\')'
       : n.type === 'maintenance'
@@ -5269,7 +5306,8 @@ function goToNotifMaxus(key) {
     firebase.database().ref('notifications/' + currentUser.uid + '/' + key).update({ read: true }).catch(() => {});
   }
   closeNotifications();
-  openMaxus();
+  const n = notifList.find(x => x.key === key);
+  openMaxus(n && n.vehicle ? n.vehicle : 'maxus');
 }
 
 function goToNotifJob(key, dayKey, jobIdx) {
