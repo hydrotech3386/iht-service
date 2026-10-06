@@ -4751,6 +4751,36 @@ function setSyncStatus(status) {
 }
 
 // ---- Persistence ----
+// Re-attach photos/files/location from the live DB to a full-state payload.
+// The localStorage cache strips attachments (stateForStorage), so after a reload the
+// in-memory state has none for days outside the viewed week — a blind full write then
+// wipes them. This cost 395 photo links on 1 Oct 2026; never write full state without it.
+function mergeAttachments(toSave, liveSchedule) {
+  const live = liveSchedule || {};
+  const merged = {};
+  Object.keys(toSave.schedule || {}).forEach(dayKey => {
+    const day = toSave.schedule[dayKey];
+    if (!day || typeof day !== 'object') { merged[dayKey] = day; return; }
+    const liveDay = live[dayKey] || {};
+    const liveJobs = liveDay.jobs ? (Array.isArray(liveDay.jobs) ? liveDay.jobs : Object.values(liveDay.jobs)) : [];
+    const jobs = (Array.isArray(day.jobs) ? day.jobs : Object.values(day.jobs || {})).map((job, idx) => {
+      if (!job) return job;
+      let src = job.jobId ? liveJobs.find(lj => lj && lj.jobId === job.jobId) : null;
+      if (!src) src = liveJobs[idx];
+      if (!src) return job;
+      const out = { ...job };
+      ['photos', 'files', 'location'].forEach(f => {
+        const mine = out[f];
+        const empty = mine === undefined || mine === null || (Array.isArray(mine) && !mine.length);
+        if (empty && src[f]) out[f] = src[f];
+      });
+      return out;
+    });
+    merged[dayKey] = { ...day, jobs };
+  });
+  return { ...toSave, schedule: merged };
+}
+
 function persistState() {
   if (VIEW_ONLY || currentRole === 'view-only' || currentRole === 'pending') return;
   state.lastModified = Date.now();
@@ -4758,7 +4788,8 @@ function persistState() {
   saveToLocalStorage();
   if (fbReady) {
     setSyncStatus('syncing');
-    fbRef.set(toSave)
+    fbRef.child('schedule').once('value')
+      .then(snap => fbRef.set(mergeAttachments(toSave, snap.val())))
       .then(() => setSyncStatus('synced'))
       .catch(() => setSyncStatus('offline'));
   }
