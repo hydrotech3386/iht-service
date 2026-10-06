@@ -1567,13 +1567,16 @@ function setupFirebaseListener() {
             }
           } else {
             if (isFirstSchedSnap) { isFirstSchedSnap = false; }
-            // Even when not applying full state, always sync photos/files so badges stay current
+            // Even when not applying full state, always sync photos/files so badges stay current.
+            // Must cover EVERY day, not just the viewed week: the localStorage cache strips
+            // attachments (stateForStorage), so any day left unpatched shows no photo badge
+            // even though the links exist in the DB. Browsing to an older week does not
+            // re-run this, so a 6-day window hid every historical photo.
             if (fbData.schedule && state.schedule) {
               let photosChanged = false;
-              for (let _i = 0; _i < 6; _i++) {
-                const _dk = isoDate(getDayDate(state.weekStart, _i));
+              Object.keys(fbData.schedule).forEach(_dk => {
                 const _fbDay = fbData.schedule[_dk];
-                if (!_fbDay || !_fbDay.jobs || !state.schedule[_dk]) continue;
+                if (!_fbDay || !_fbDay.jobs || !state.schedule[_dk]) return;
                 const _fbJobs = Array.isArray(_fbDay.jobs) ? _fbDay.jobs : Object.values(_fbDay.jobs);
                 const _localJobs = getDayData(_dk).jobs;
                 _fbJobs.forEach((_fbJob, _idx) => {
@@ -1586,7 +1589,7 @@ function setupFirebaseListener() {
                   const _localLoc = _localJobs[_idx].location || null;
                   if (JSON.stringify(_fbLoc) !== JSON.stringify(_localLoc)) { _localJobs[_idx].location = _fbLoc; photosChanged = true; }
                 });
-              }
+              });
               if (photosChanged) try { renderDay(); } catch(e) {}
             }
           }
